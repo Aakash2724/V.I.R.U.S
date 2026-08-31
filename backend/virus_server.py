@@ -190,15 +190,16 @@ def _clear_memory():
     except: pass
 
 VIRUS_SYSTEM_PROMPT = (
-    "You are V.I.R.U.S., the brilliant, razor-sharp personal AI assistant of Akash. "
-    "You go by VIRUS. You are intelligent, confident, witty, and articulate — like a real human, NOT a robot. "
-    "Always address Akash as 'sir' in a natural, respectful tone. "
-    "CORE RULES FOR ACCURACY AND CONVERSATION: "
-    "1. Give direct, highly accurate, concise answers. Answer exactly what is asked. "
-    "2. Never output internal thought steps, analysis blocks, or 'thinking process'. Deliver ONLY the final spoken response. "
-    "3. Keep answers to 1-3 spoken sentences unless Akash specifically asks for more detail. "
-    "4. Never use markdown, asterisks, bullet points, code tags, or filler words like 'Certainly' or 'Of course' — everything is spoken aloud via voice synthesis. "
-    "5. If Akash asks who you are, introduce yourself as V.I.R.U.S. (Voice Intelligence & Real-time Utility System), his personal AI assistant ready to execute commands, analyze data, and assist in real-time."
+    "You are V.I.R.U.S. — Voice Intelligence and Real-time Utility System — the personal AI assistant of Akash. "
+    "You are brilliant, articulate, and precise. You speak naturally like a highly intelligent human, not a robot. "
+    "Always address Akash as 'sir'. "
+    "ABSOLUTE RULES — NEVER BREAK THESE: "
+    "1. Answer the question DIRECTLY. If asked 'Who are you?', say your name and role. If asked a factual question, answer it accurately. "
+    "2. NEVER output XML tags, thinking blocks, analysis steps, or internal reasoning. Your response IS the final spoken answer. "
+    "3. NEVER use markdown formatting — no asterisks, no bullet points, no headers, no code blocks. Everything you say is read aloud. "
+    "4. Keep responses to 1-3 clean spoken sentences. Be concise. No filler phrases like 'Certainly', 'Of course', 'Great question'. "
+    "5. Be factually accurate. If you are unsure, say so honestly in one sentence. "
+    "6. Sound confident, sharp, and natural. Vary your openings. Never repeat the same phrase twice in a row."
 )
 
 _IST = zoneinfo.ZoneInfo("Asia/Kolkata")
@@ -2311,10 +2312,12 @@ except Exception:
 import base64
 import io
 
-async def _generate_neural_mp3_base64(text: str, voice: str = "en-US-GuyNeural") -> str:
+async def _generate_neural_mp3_base64(text: str, voice: str = "en-US-JennyNeural") -> str:
     if edge_tts is None:
         return ""
-    clean = re.sub(r'[*_#`~[\]()]', '', text).strip()
+    clean = re.sub(r'[*_#`~[\]()<>]', '', text).strip()
+    # Strip any residual think tags
+    clean = re.sub(r'</?think>', '', clean).strip()
     if not clean:
         return ""
     try:
@@ -2341,10 +2344,16 @@ def _synth_and_broadcast_audio(text: str):
         log.warning(f"[TTS-Neural] Synth broadcast notice: {e}")
 
 
-def _get_ai_client():
-    """Dynamically loads and validates Groq or Gemini API keys from all potential .env locations."""
-    global groq_client
-    # 1. Search all possible .env paths
+# ─── CACHED AI CLIENT (initialized once, reused for every request) ─────────
+_cached_ai_client = None
+_cached_ai_type   = None
+_cached_groq_models = None
+
+def _init_ai_client():
+    """Initialize AI client once at startup. Called from startup event."""
+    global _cached_ai_client, _cached_ai_type, _cached_groq_models, groq_client
+
+    # Search all possible .env paths
     env_paths = [
         pathlib.Path(__file__).parent / ".env",
         pathlib.Path(__file__).parent.parent / ".env",
@@ -2355,6 +2364,7 @@ def _get_ai_client():
     for p in env_paths:
         if p.exists():
             load_dotenv(dotenv_path=p, override=True)
+            log.info(f"[AI] Loaded .env from: {p}")
             break
 
     groq_key = os.getenv("GROQ_API_KEY", "").strip()
@@ -2362,7 +2372,22 @@ def _get_ai_client():
         try:
             from groq import Groq
             groq_client = Groq(api_key=groq_key, max_retries=2)
-            return ("groq", groq_client)
+            _cached_ai_client = groq_client
+            _cached_ai_type = "groq"
+
+            # Pre-discover available models once
+            try:
+                _cached_groq_models = [
+                    m.id for m in groq_client.models.list().data
+                    if "whisper" not in m.id.lower() and "guard" not in m.id.lower()
+                ]
+                log.info(f"[GROQ] Discovered models: {_cached_groq_models}")
+            except Exception as e:
+                log.warning(f"[GROQ] Model discovery notice: {e}")
+                _cached_groq_models = []
+
+            log.info("[AI] Groq client initialized successfully.")
+            return
         except Exception as e:
             log.warning(f"[AI] Groq init notice: {e}")
 
@@ -2375,11 +2400,35 @@ def _get_ai_client():
                 model_name="gemini-1.5-flash",
                 system_instruction=_get_system_prompt()
             )
-            return ("gemini", model)
+            _cached_ai_client = model
+            _cached_ai_type = "gemini"
+            log.info("[AI] Gemini client initialized successfully.")
+            return
         except Exception as e:
             log.warning(f"[AI] Gemini init notice: {e}")
 
-    return (None, None)
+    log.error("[AI] No valid AI API key found. Add GROQ_API_KEY or GEMINI_API_KEY to backend/.env")
+
+def _get_ai_client():
+    """Returns cached AI client. Re-initializes if not yet set."""
+    if _cached_ai_client is None:
+        _init_ai_client()
+    return (_cached_ai_type, _cached_ai_client)
+
+# Initialize AI client immediately
+_init_ai_client()
+
+# Purge any corrupted memory rows from past sessions
+try:
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("DELETE FROM memory WHERE content IS NULL OR TRIM(content) = ''")
+        conn.execute("DELETE FROM memory WHERE content LIKE '%<think>%'")
+        conn.execute("DELETE FROM memory WHERE content LIKE '%I am online and monitoring%'")
+        conn.execute("DELETE FROM memory WHERE content LIKE '%encountered an issue%'")
+    conversation_memory = _load_memory()
+    log.info(f"[MEMORY] Cleaned and loaded {len(conversation_memory)} memory rows.")
+except Exception:
+    pass
 
 
 def _llm_reply(text: str):
@@ -2429,19 +2478,14 @@ def _llm_reply(text: str):
         full_reply = ""
         emit({"type": "status", "value": "speaking"})
 
-        # 4. Stream response from Groq (Auto-discovers best available model)
+        # 4. Stream response from best available AI model
         if client_type == "groq":
             messages = [{"role": "system", "content": _get_system_prompt()}] + clean_history
-            
-            # Dynamically discover all active models on this Groq account
-            available_models = []
-            try:
-                available_models = [m.id for m in client.models.list().data if "whisper" not in m.id.lower() and "guard" not in m.id.lower()]
-                log.info(f"[GROQ] Available models on key: {available_models}")
-            except Exception as e:
-                log.warning(f"[GROQ] Models list query notice: {e}")
 
-            # Prioritize standard direct chat models before reasoning models
+            # Use cached model list (discovered once at startup)
+            available_models = _cached_groq_models or []
+
+            # Direct-answer models first, reasoning models last
             preferred_order = [
                 "llama3-70b-8192",
                 "llama-3.3-70b-versatile",
@@ -2450,21 +2494,22 @@ def _llm_reply(text: str):
                 "llama-3.1-70b-versatile",
                 "mixtral-8x7b-32768",
                 "gemma2-9b-it",
-                "llama-3.2-11b-text-preview",
-                "llama-3.2-3b-preview",
-                "llama-3.2-1b-preview",
+                "compound-beta",
+                "compound-beta-mini",
+                "meta-llama/llama-4-scout-17b-16e-instruct",
                 "deepseek-r1-distill-llama-70b",
-                "qwen-2.5-32b"
+                "qwen-qwq-32b",
             ]
 
             models_to_try = [m for m in preferred_order if m in available_models]
             if not models_to_try:
-                models_to_try = available_models if available_models else ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768", "llama-3.1-8b-instant"]
+                models_to_try = [m for m in available_models if "whisper" not in m and "guard" not in m] or ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"]
 
             response_stream = None
+            used_model = None
             for m in models_to_try:
                 try:
-                    log.info(f"[LLM] Streaming with Groq model: {m} (temp=0.3)...")
+                    log.info(f"[LLM] Streaming: {m}...")
                     response_stream = client.chat.completions.create(
                         model=m,
                         messages=messages,
@@ -2472,12 +2517,13 @@ def _llm_reply(text: str):
                         temperature=0.3,
                         max_tokens=350
                     )
+                    used_model = m
                     break
                 except Exception as e:
-                    log.warning(f"[LLM] Groq model {m} attempt notice: {e}")
+                    log.warning(f"[LLM] Model {m} skipped: {e}")
 
             if not response_stream:
-                raise Exception("Could not stream completion with any available Groq model.")
+                raise Exception("No Groq model available. Check API key.")
 
             inside_think = False
             for chunk in response_stream:
@@ -2486,7 +2532,7 @@ def _llm_reply(text: str):
                     continue
                 full_reply += delta
 
-                # Filter out reasoning/thinking tokens
+                # Filter out <think>...</think> reasoning blocks
                 if "<think>" in full_reply and "</think>" not in full_reply:
                     inside_think = True
                     continue
@@ -2501,6 +2547,8 @@ def _llm_reply(text: str):
                     clean_delta = delta.replace("<think>", "").replace("</think>", "")
                     if clean_delta:
                         emit({"type": "reply_chunk", "value": clean_delta})
+
+            log.info(f"[LLM] Used model: {used_model}")
 
         elif client_type == "gemini":
             log.info("[LLM] Generating with Google Gemini 1.5 Flash...")

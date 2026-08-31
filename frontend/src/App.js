@@ -272,46 +272,59 @@ function App() {
         rec.continuous = true;
         rec.interimResults = true;
         rec.lang = 'en-US';
+        rec.maxAlternatives = 1;
 
         rec.onstart = () => {
-          console.log('[VIRUS Voice] Automatic listening active.');
+          console.log('[VIRUS Voice] Listening...');
         };
 
         rec.onresult = (evt) => {
           let interim = '';
-          let final = '';
+          let finalText = '';
           for (let i = evt.resultIndex; i < evt.results.length; ++i) {
-            if (evt.results[i].isFinal) {
-              final += evt.results[i][0].transcript;
+            const result = evt.results[i];
+            if (result.isFinal) {
+              // Only accept results with reasonable confidence
+              const confidence = result[0].confidence || 0;
+              const text = result[0].transcript.trim();
+              if (text && (confidence > 0.4 || confidence === 0)) {
+                finalText += text;
+              }
             } else {
-              interim += evt.results[i][0].transcript;
+              interim += result[0].transcript;
             }
           }
           if (interim) {
             setInterimTranscript(interim);
             setStatus('listening');
           }
-          if (final && final.trim()) {
-            handleSendMessage(final.trim());
+          if (finalText) {
+            console.log('[VIRUS Voice] Recognized:', finalText);
+            handleSendMessage(finalText);
           }
         };
 
         rec.onerror = (e) => {
-          if (e.error !== 'no-speech') {
+          if (e.error !== 'no-speech' && e.error !== 'aborted') {
             console.warn('[VIRUS Voice] Notice:', e.error);
+          }
+          // Restart quickly on all recoverable errors
+          if (!isDestroyed && e.error !== 'not-allowed') {
+            setTimeout(startContinuousListening, 100);
           }
         };
 
         rec.onend = () => {
+          // Restart immediately when recognition session ends
           if (!isDestroyed) {
-            setTimeout(startContinuousListening, 200);
+            setTimeout(startContinuousListening, 50);
           }
         };
 
         rec.start();
       } catch (err) {
         if (!isDestroyed) {
-          setTimeout(startContinuousListening, 1000);
+          setTimeout(startContinuousListening, 500);
         }
       }
     };
