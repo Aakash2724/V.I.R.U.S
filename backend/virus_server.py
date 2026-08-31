@@ -2354,6 +2354,7 @@ def _llm_reply(text: str):
                 emit({"type": "reply_chunk", "value": delta})
 
         _add_memory("assistant", full_reply)
+        emit({"type": "reply", "value": full_reply})
         emit({"type": "reply_end"})
         emit({"type": "status", "value": "idle"})
         _session_last_active = time.time()

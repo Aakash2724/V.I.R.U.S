@@ -93,17 +93,44 @@ function App() {
 
   /* ── Browser Speech Synthesis (Spoken Response) ─────────────── */
   const speakText = useCallback((text) => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window && text) {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window) || !text) return;
+
+    const clean = text.replace(/[*_#`~[\]()]/g, '').trim();
+    if (!clean) return;
+
+    try {
       window.speechSynthesis.cancel();
-      const clean = text.replace(/[*_#`]/g, '').trim();
-      if (!clean) return;
-      const utterance = new SpeechSynthesisUtterance(clean);
-      utterance.rate = 1.05;
-      utterance.pitch = 1.0;
-      utterance.onstart = () => setStatus('speaking');
-      utterance.onend = () => setStatus('idle');
-      window.speechSynthesis.speak(utterance);
+      window.speechSynthesis.resume();
+    } catch (_) {}
+
+    const utterance = new SpeechSynthesisUtterance(clean);
+    utterance.rate = 1.05;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    const voices = window.speechSynthesis.getVoices();
+    if (voices && voices.length > 0) {
+      const engVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('David') || v.name.includes('Zira') || v.name.includes('English')))
+        || voices.find(v => v.lang.startsWith('en'))
+        || voices[0];
+      if (engVoice) utterance.voice = engVoice;
     }
+
+    utterance.onstart = () => {
+      console.log('[TTS] Speaking aloud...');
+      setStatus('speaking');
+    };
+    utterance.onend = () => {
+      setStatus('idle');
+    };
+    utterance.onerror = (e) => {
+      console.warn('[TTS] Speech synthesis notice:', e);
+      setStatus('idle');
+    };
+
+    // Chrome garbage-collection protection
+    window._currentUtterance = utterance;
+    window.speechSynthesis.speak(utterance);
   }, []);
 
   /* ── WebSocket ──────────────────────────────────────────────── */
@@ -124,13 +151,16 @@ function App() {
         }
       }
     }, []),
+    onReply: useCallback((fullText) => {
+      if (fullText) {
+        setLlmReply(fullText);
+        speakText(fullText);
+      }
+    }, [speakText]),
     onReplyChunk: useCallback(chunk => setLlmReply(prev => prev + chunk), []),
     onReplyEnd:   useCallback(() => { 
       resetNextTranscript.current = true; 
-      if (llmReplyRef.current) {
-        speakText(llmReplyRef.current);
-      }
-    }, [speakText]),
+    }, []),
     onStatus:     useCallback(s => setStatus(s), []),
     onSysMetrics: useCallback(m => setSysMetrics(m), []),
     onCricketUpdate: useCallback(data => setCricketData(data), [])
