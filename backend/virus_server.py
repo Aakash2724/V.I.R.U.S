@@ -29,17 +29,21 @@ def _thread_wrap(fn, name):
         fn()
     except Exception:
         log.error(f"[THREAD CRASH] {name}:\n{traceback.format_exc()}")
-import numpy as np
+HAS_PHYSICAL_AUDIO = (os.path.exists("/dev/snd") and len(os.listdir("/dev/snd")) > 0) if sys.platform != "win32" else True
 
-try:
-    import pyaudio
-except Exception:
-    pyaudio = None
+pyaudio = None
+sc = None
 
-try:
-    import soundcard as sc
-except Exception:
-    sc = None
+if HAS_PHYSICAL_AUDIO:
+    try:
+        import pyaudio
+    except Exception:
+        pyaudio = None
+
+    try:
+        import soundcard as sc
+    except Exception:
+        sc = None
 
 import torch
 from dotenv import load_dotenv
@@ -2704,21 +2708,23 @@ def _tts_worker():
 
 @app.on_event("startup")
 async def on_startup():
-    global _loop, p_audio
+    global _loop
     _loop = asyncio.get_running_loop()
     
-    # Wait for port 8000 to fully bind and for wake_listener.py to detect it and release the mic
-    print("[VIRUS] Waiting 3 seconds for wake_listener to release microphone...")
-    await asyncio.sleep(3.0)
-    
-    threading.Thread(target=_thread_wrap, args=(_mic_read_thread,  "mic_read_thread"),  daemon=True).start()
+    if HAS_PHYSICAL_AUDIO:
+        print("[VIRUS] Physical audio hardware detected. Starting local mic listener...")
+        await asyncio.sleep(1.0)
+        threading.Thread(target=_thread_wrap, args=(_mic_read_thread,  "mic_read_thread"),  daemon=True).start()
+        threading.Thread(target=_thread_wrap, args=(_whisper_thread,   "whisper_thread"),   daemon=True).start()
+        threading.Thread(target=_thread_wrap, args=(_barge_in_monitor, "barge_in_monitor"), daemon=True).start()
+    else:
+        log.info("[VIRUS] Headless cloud server detected. Running in cloud mode.")
+
     threading.Thread(target=_thread_wrap, args=(_level_thread,     "level_thread"),     daemon=True).start()
     threading.Thread(target=_thread_wrap, args=(_sys_metrics_thread,"sys_metrics_thread"), daemon=True).start()
-    threading.Thread(target=_thread_wrap, args=(_cricket_thread,"cricket_thread"), daemon=True).start()
-    threading.Thread(target=_thread_wrap, args=(_whisper_thread,   "whisper_thread"),   daemon=True).start()
+    threading.Thread(target=_thread_wrap, args=(_cricket_thread,   "cricket_thread"),   daemon=True).start()
     threading.Thread(target=_thread_wrap, args=(_tts_worker,       "tts_worker"),       daemon=True).start()
-    threading.Thread(target=_thread_wrap, args=(_barge_in_monitor, "barge_in_monitor"), daemon=True).start()
-    log.info("[VIRUS] All threads started.")
+    log.info("[VIRUS] All active background threads started.")
 
 # ─── WEBSOCKET ───────────────────────────────────────────────────────────
 @app.websocket("/ws")
@@ -2726,10 +2732,27 @@ async def ws_endpoint(ws: WebSocket):
     await ws.accept()
     clients.append(ws)
     try:
+        # Immediately emit active status and system metrics to connected client
+        await ws.send_text(json.dumps({"type": "status", "value": "idle"}))
+        await ws.send_text(json.dumps({
+            "type": "sys_metrics", 
+            "value": {
+                "cpu": psutil.cpu_percent(interval=None) if 'psutil' in sys.modules else 0,
+                "ram": psutil.virtual_memory().percent if 'psutil' in sys.modules else 0,
+                "ping": 12
+            }
+        }))
         while True:
             msg = await ws.receive_text()
             if msg == "clear_memory":
                 _clear_memory()
+            elif msg.startswith("{"):
+                try:
+                    data = json.loads(msg)
+                    if data.get("type") == "user_text":
+                        threading.Thread(target=lambda t=data.get("text", ""): _llm_reply(t), daemon=True).start()
+                except Exception as e:
+                    log.warning(f"WebSocket parse error: {e}")
     except WebSocketDisconnect:
         if ws in clients:
             clients.remove(ws)
