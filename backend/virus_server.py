@@ -2436,28 +2436,52 @@ def _llm_reply(text: str):
         full_reply = ""
         emit({"type": "status", "value": "speaking"})
 
-        # 4. Stream response from Groq (Llama-3.3-70B flagship / Llama-3.1-8B)
+        # 4. Stream response from Groq (Auto-discovers best available model)
         if client_type == "groq":
             messages = [{"role": "system", "content": _get_system_prompt()}] + clean_history
-            models_to_try = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
-            response_stream = None
+            
+            # Dynamically discover all active models on this Groq account
+            available_models = []
+            try:
+                available_models = [m.id for m in client.models.list().data if "whisper" not in m.id.lower() and "guard" not in m.id.lower()]
+                log.info(f"[GROQ] Available models on key: {available_models}")
+            except Exception as e:
+                log.warning(f"[GROQ] Models list query notice: {e}")
 
+            preferred_order = [
+                "llama-3.3-70b-versatile",
+                "llama3-70b-8192",
+                "llama-3.1-70b-versatile",
+                "llama-3.1-8b-instant",
+                "llama3-8b-8192",
+                "mixtral-8x7b-32768",
+                "gemma2-9b-it",
+                "llama-3.2-11b-text-preview",
+                "llama-3.2-3b-preview",
+                "llama-3.2-1b-preview"
+            ]
+
+            models_to_try = [m for m in preferred_order if m in available_models]
+            if not models_to_try:
+                models_to_try = available_models if available_models else ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768", "llama-3.1-8b-instant"]
+
+            response_stream = None
             for m in models_to_try:
                 try:
-                    log.info(f"[LLM] Trying Groq model: {m} (temp=0.3)...")
+                    log.info(f"[LLM] Streaming with Groq model: {m} (temp=0.3)...")
                     response_stream = client.chat.completions.create(
                         model=m,
                         messages=messages,
                         stream=True,
                         temperature=0.3,
-                        max_tokens=300
+                        max_tokens=350
                     )
                     break
                 except Exception as e:
-                    log.warning(f"[LLM] Groq model {m} failed: {e}")
+                    log.warning(f"[LLM] Groq model {m} attempt notice: {e}")
 
             if not response_stream:
-                raise Exception("Groq completion models failed.")
+                raise Exception("Could not stream completion with any available Groq model.")
 
             for chunk in response_stream:
                 delta = chunk.choices[0].delta.content or ""
