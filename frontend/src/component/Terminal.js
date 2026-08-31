@@ -17,11 +17,20 @@ export default function Terminal({
   status = 'idle',
   style = {},
   onPointerDown,
+  onSendMessage,
 }) {
-  const hasTranscript = !!transcript;
+  const [typedInput, setTypedInput] = React.useState('');
+  const hasTranscript = !!transcript || !!interim;
   const hasReply = !!llmReply;
   const mode = STATUS_MODE[status] || STATUS_MODE.idle;
   const glowColor = color;
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && typedInput.trim()) {
+      onSendMessage?.(typedInput.trim());
+      setTypedInput('');
+    }
+  };
 
   return (
     <div
@@ -55,24 +64,51 @@ export default function Terminal({
             {mode.label}
           </span>
         </div>
-        <div className="terminal-body">
+        <div className="terminal-body" style={{ display: 'flex', alignItems: 'center' }}>
           <div
             className="terminal-prompt"
             style={{
               color: hasTranscript ? '#ff2d55' : 'rgba(255,45,85,0.3)',
               textShadow: hasTranscript ? '0 0 12px #ff2d55' : 'none',
+              marginRight: '8px'
             }}
           >
             {'>'}
           </div>
-          <div className="terminal-text-area" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {hasTranscript && (
+          <div className="terminal-text-area" style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+            {transcript && (
               <span
                 className="terminal-text speech"
                 style={{ color: '#0066FF', textShadow: '0 0 10px rgba(0, 102, 255, 0.6)' }}
               >
                 {transcript}
               </span>
+            )}
+            {interim && (
+              <span
+                className="terminal-text speech-interim"
+                style={{ color: '#00d2ff', fontStyle: 'italic', opacity: 0.85 }}
+              >
+                {interim}
+              </span>
+            )}
+            {!transcript && !interim && onSendMessage && (
+              <input
+                type="text"
+                value={typedInput}
+                onChange={(e) => setTypedInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Speak or type a command..."
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  color: '#00f3c8',
+                  fontFamily: 'inherit',
+                  fontSize: '14px',
+                  width: '100%',
+                }}
+              />
             )}
           </div>
           <div

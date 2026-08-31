@@ -14,6 +14,7 @@ import ActivityMonitor  from './component/ActivityMonitor';
 import GreetingWidget   from './component/GreetingWidget';
 import CricketWidget    from './component/CricketWidget';
 import useVirusSocket   from './hooks/useVirusSocket';
+import useSharedMic     from './hooks/useSharedMic';
 
 /* ── Blob-specific defaults (centered + 500px) ────────────────── */
 const DEFAULT_SETTINGS = {
@@ -84,6 +85,26 @@ function App() {
   const [commandCount,    setCommandCount]    = useState(0);
   const [startTime]                           = useState(() => Date.now());
   const resetNextTranscript = useRef(false);
+  const llmReplyRef         = useRef('');
+
+  useEffect(() => {
+    llmReplyRef.current = llmReply;
+  }, [llmReply]);
+
+  /* ── Browser Speech Synthesis (Spoken Response) ─────────────── */
+  const speakText = useCallback((text) => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window && text) {
+      window.speechSynthesis.cancel();
+      const clean = text.replace(/[*_#`]/g, '').trim();
+      if (!clean) return;
+      const utterance = new SpeechSynthesisUtterance(clean);
+      utterance.rate = 1.05;
+      utterance.pitch = 1.0;
+      utterance.onstart = () => setStatus('speaking');
+      utterance.onend = () => setStatus('idle');
+      window.speechSynthesis.speak(utterance);
+    }
+  }, []);
 
   /* ── WebSocket ──────────────────────────────────────────────── */
   const levelRef = useVirusSocket({
@@ -104,11 +125,104 @@ function App() {
       }
     }, []),
     onReplyChunk: useCallback(chunk => setLlmReply(prev => prev + chunk), []),
-    onReplyEnd:   useCallback(() => { resetNextTranscript.current = true; }, []),
+    onReplyEnd:   useCallback(() => { 
+      resetNextTranscript.current = true; 
+      if (llmReplyRef.current) {
+        speakText(llmReplyRef.current);
+      }
+    }, [speakText]),
     onStatus:     useCallback(s => setStatus(s), []),
     onSysMetrics: useCallback(m => setSysMetrics(m), []),
     onCricketUpdate: useCallback(data => setCricketData(data), [])
   });
+
+  /* ── Local Browser Microphone for PlasmaBlob Animation ──────── */
+  const localMicLevelRef = useSharedMic({ sensitivity: Number(blobSettings.sensitivity) || 1 });
+  const combinedLevelRef = useRef(0);
+
+  useEffect(() => {
+    let animId;
+    const updateLevels = () => {
+      const serverLvl = (levelRef && levelRef.current) || 0;
+      const localLvl  = (localMicLevelRef && localMicLevelRef.current) || 0;
+      combinedLevelRef.current = Math.max(serverLvl, localLvl);
+      animId = requestAnimationFrame(updateLevels);
+    };
+    animId = requestAnimationFrame(updateLevels);
+    return () => cancelAnimationFrame(animId);
+  }, [levelRef, localMicLevelRef]);
+
+  /* ── Send Message Helper ────────────────────────────────────── */
+  const handleSendMessage = useCallback((text) => {
+    if (!text || !text.trim()) return;
+    const clean = text.trim();
+    setTranscript(clean);
+    setInterimTranscript('');
+    setStatus('processing');
+    setLlmReply('');
+    setCommandCount(c => c + 1);
+    levelRef.sendUserText?.(clean);
+  }, [levelRef]);
+
+  /* ── Continuous Web Speech Recognition (Browser Voice Input) ─ */
+  useEffect(() => {
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRec) return;
+
+    let rec;
+    let shouldRestart = true;
+
+    try {
+      rec = new SpeechRec();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = 'en-US';
+
+      rec.onresult = (evt) => {
+        let interim = '';
+        let final = '';
+        for (let i = evt.resultIndex; i < evt.results.length; ++i) {
+          if (evt.results[i].isFinal) {
+            final += evt.results[i][0].transcript;
+          } else {
+            interim += evt.results[i][0].transcript;
+          }
+        }
+        if (interim) {
+          setInterimTranscript(interim);
+          setStatus('listening');
+        }
+        if (final) {
+          handleSendMessage(final);
+        }
+      };
+
+      rec.onerror = (e) => {
+        if (e.error !== 'no-speech') {
+          console.warn('[WebSpeech] Recognition notice:', e.error);
+        }
+      };
+
+      rec.onend = () => {
+        if (shouldRestart) {
+          setTimeout(() => {
+            try { rec.start(); } catch (_) {}
+          }, 300);
+        }
+      };
+
+      rec.start();
+    } catch (err) {
+      console.warn('[WebSpeech] SpeechRecognition init:', err);
+    }
+
+    return () => {
+      shouldRestart = false;
+      if (rec) {
+        try { rec.stop(); } catch (_) {}
+      }
+    };
+  }, [handleSendMessage]);
 
   /* ── Persist blob settings ──────────────────────────────────── */
   useEffect(() => {
@@ -224,6 +338,7 @@ function App() {
           llmReply={llmReply}
           status={status}
           style={{ width: '30vw', minWidth: '280px' }}
+          onSendMessage={handleSendMessage}
         />
       </DraggableWidget>
 
@@ -273,7 +388,7 @@ function App() {
                 sensitivity={safeSens}
                 color={safeColor}
                 size={safeSize}
-                externalLevelRef={levelRef}
+                externalLevelRef={combinedLevelRef}
               />
             </div>
           </div>

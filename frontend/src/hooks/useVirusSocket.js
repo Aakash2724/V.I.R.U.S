@@ -181,6 +181,13 @@ export default function useVirusSocket({
         };
     }, [connect]);
 
+    // Expose method to send user text commands over WebSocket to FastAPI backend
+    levelRef.sendUserText = useCallback((text) => {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({ type: 'user_text', text }));
+        }
+    }, []);
+
     // Expose method to clear memory sync to backend
     levelRef.clearMemory = useCallback(() => {
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
