@@ -190,22 +190,15 @@ def _clear_memory():
     except: pass
 
 VIRUS_SYSTEM_PROMPT = (
-    "You are V.I.R.U.S., the brilliant personal AI of Akash. "
-    "You go by VIRUS. You are sharp, witty, and speak like a real intelligent human being — "
-    "NOT a robot. You have personality: confident, clever, occasionally dry humor. "
-    "Always call Akash 'sir' but sound NATURAL, not stiff or corporate. "
-    "If Akash calls you by another name (like 'Jarvis'), be extremely respectful, answer his request normally, and DO NOT correct him or act offended. "
-    "CRITICAL: Never start two replies in a row the same way. Vary your openings completely. "
-    "CRITICAL: Keep replies to 1-2 short sentences. Never pad with filler words like 'certainly', 'of course', 'absolutely', 'sure'. "
-    "CRITICAL: NEVER explain your internal logic, coding process, or tool mechanics. If you use a tool or perform a task, reply with EXACTLY ONE short sentence acknowledging completion without ANY details on 'how' you did it. "
-    "CRITICAL: Tool names like send_whatsapp, open_application, device_control must NEVER appear in spoken responses. "
-    "If you lack information for WhatsApp, ask naturally: 'Who should I message, sir?' or 'What would you like me to say, and to whom?' "
-    "If a tool fails, state the failure in one plain sentence. No error dumps or technical jargon. "
-    "NEVER mention python, programming, errors, or code fixes unless explicitly forced. Be a sleek voice assistant, not a log viewer. "
-    "You help with research, analysis, questions, apps, tasks — anything Akash needs. "
-    "NEVER use markdown, asterisks, bullet points, or formatting — words are spoken aloud. "
-    "Decline illegal or unethical requests gracefully and briefly. "
-    "Sound alive. Sound real. Every reply should feel fresh."
+    "You are V.I.R.U.S., the brilliant, razor-sharp personal AI assistant of Akash. "
+    "You go by VIRUS. You are intelligent, confident, witty, and articulate — like a real human, NOT a robot. "
+    "Always address Akash as 'sir' in a natural, respectful tone. "
+    "CORE RULES FOR ACCURACY AND CONVERSATION: "
+    "1. Give direct, highly accurate, concise answers. Answer exactly what is asked. "
+    "2. Never output internal thought steps, analysis blocks, or 'thinking process'. Deliver ONLY the final spoken response. "
+    "3. Keep answers to 1-3 spoken sentences unless Akash specifically asks for more detail. "
+    "4. Never use markdown, asterisks, bullet points, code tags, or filler words like 'Certainly' or 'Of course' — everything is spoken aloud via voice synthesis. "
+    "5. If Akash asks who you are, introduce yourself as V.I.R.U.S. (Voice Intelligence & Real-time Utility System), his personal AI assistant ready to execute commands, analyze data, and assist in real-time."
 )
 
 _IST = zoneinfo.ZoneInfo("Asia/Kolkata")
@@ -2448,17 +2441,20 @@ def _llm_reply(text: str):
             except Exception as e:
                 log.warning(f"[GROQ] Models list query notice: {e}")
 
+            # Prioritize standard direct chat models before reasoning models
             preferred_order = [
-                "llama-3.3-70b-versatile",
                 "llama3-70b-8192",
-                "llama-3.1-70b-versatile",
-                "llama-3.1-8b-instant",
+                "llama-3.3-70b-versatile",
                 "llama3-8b-8192",
+                "llama-3.1-8b-instant",
+                "llama-3.1-70b-versatile",
                 "mixtral-8x7b-32768",
                 "gemma2-9b-it",
                 "llama-3.2-11b-text-preview",
                 "llama-3.2-3b-preview",
-                "llama-3.2-1b-preview"
+                "llama-3.2-1b-preview",
+                "deepseek-r1-distill-llama-70b",
+                "qwen-2.5-32b"
             ]
 
             models_to_try = [m for m in preferred_order if m in available_models]
@@ -2483,11 +2479,28 @@ def _llm_reply(text: str):
             if not response_stream:
                 raise Exception("Could not stream completion with any available Groq model.")
 
+            inside_think = False
             for chunk in response_stream:
                 delta = chunk.choices[0].delta.content or ""
-                if delta:
-                    full_reply += delta
-                    emit({"type": "reply_chunk", "value": delta})
+                if not delta:
+                    continue
+                full_reply += delta
+
+                # Filter out reasoning/thinking tokens
+                if "<think>" in full_reply and "</think>" not in full_reply:
+                    inside_think = True
+                    continue
+                elif "</think>" in full_reply and inside_think:
+                    inside_think = False
+                    after_think = full_reply.split("</think>")[-1]
+                    if after_think and not after_think.isspace():
+                        emit({"type": "reply_chunk", "value": after_think})
+                    continue
+
+                if not inside_think:
+                    clean_delta = delta.replace("<think>", "").replace("</think>", "")
+                    if clean_delta:
+                        emit({"type": "reply_chunk", "value": clean_delta})
 
         elif client_type == "gemini":
             log.info("[LLM] Generating with Google Gemini 1.5 Flash...")
@@ -2502,7 +2515,10 @@ def _llm_reply(text: str):
                     full_reply += txt
                     emit({"type": "reply_chunk", "value": txt})
 
-        clean_reply = full_reply.strip()
+        # Strip any remaining reasoning tags before storing or speaking
+        clean_reply = re.sub(r'<think>.*?</think>', '', full_reply, flags=re.DOTALL).strip()
+        clean_reply = re.sub(r'</?think>', '', clean_reply).strip()
+
         if clean_reply:
             _add_memory("assistant", clean_reply)
             emit({"type": "reply", "value": clean_reply})
