@@ -31,6 +31,7 @@ def _thread_wrap(fn, name):
         log.error(f"[THREAD CRASH] {name}:\n{traceback.format_exc()}")
 HAS_PHYSICAL_AUDIO = (os.path.exists("/dev/snd") and len(os.listdir("/dev/snd")) > 0) if sys.platform != "win32" else True
 
+import numpy as np
 pyaudio = None
 sc = None
 
