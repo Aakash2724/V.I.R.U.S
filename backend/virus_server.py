@@ -30,8 +30,17 @@ def _thread_wrap(fn, name):
     except Exception:
         log.error(f"[THREAD CRASH] {name}:\n{traceback.format_exc()}")
 import numpy as np
-import pyaudio
-import soundcard as sc
+
+try:
+    import pyaudio
+except Exception:
+    pyaudio = None
+
+try:
+    import soundcard as sc
+except Exception:
+    sc = None
+
 import torch
 from dotenv import load_dotenv
 
@@ -103,6 +112,8 @@ system_audio_rms: float       = 0.0
 
 def _loopback_monitor_thread():
     global system_audio_playing, system_audio_rms
+    if sc is None:
+        return
     while True:
         try:
             lb = sc.default_speaker().name
@@ -120,7 +131,8 @@ def _loopback_monitor_thread():
             log.warning(f"[loopback_monitor] error: {e}")
             time.sleep(2)
 
-threading.Thread(target=_loopback_monitor_thread, daemon=True, name="LoopbackMonitor").start()
+if sc is not None:
+    threading.Thread(target=_loopback_monitor_thread, daemon=True, name="LoopbackMonitor").start()
 
 import sqlite3
 
