@@ -2829,6 +2829,7 @@ async def ws_endpoint(ws: WebSocket):
             clients.remove(ws)
 # ─── HEALTH CHECKS (Supports GET & HEAD for UptimeRobot / monitoring) ───
 @app.api_route("/api/health", methods=["GET", "HEAD"])
+@app.api_route("/api/health/", methods=["GET", "HEAD"])
 async def api_health_check():
     return {
         "status": "online",
@@ -2839,6 +2840,7 @@ async def api_health_check():
     }
 
 @app.api_route("/health", methods=["GET", "HEAD"])
+@app.api_route("/health/", methods=["GET", "HEAD"])
 async def root_health_check():
     return {
         "status": "online",
