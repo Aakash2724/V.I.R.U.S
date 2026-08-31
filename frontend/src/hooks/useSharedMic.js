@@ -22,12 +22,11 @@ export default function useSharedMic({ sensitivity = 0.2 } = {}) {
 
         async function startAnalyser() {
             try {
-                // Disable audio processing to prevent Windows from locking the mic in Exclusive Mode!
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     audio: {
-                        echoCancellation: false,
-                        noiseSuppression: false,
-                        autoGainControl: false
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
                     }, 
                     video: false 
                 });
@@ -44,8 +43,8 @@ export default function useSharedMic({ sensitivity = 0.2 } = {}) {
 
                 const source  = ctx.createMediaStreamSource(stream);
                 const analyser = ctx.createAnalyser();
-                analyser.fftSize = 1024;
-                analyser.smoothingTimeConstant = 0.80; 
+                analyser.fftSize = 512;
+                analyser.smoothingTimeConstant = 0.88; 
                 source.connect(analyser);
                 analyserRef.current = analyser;
 
@@ -63,11 +62,15 @@ export default function useSharedMic({ sensitivity = 0.2 } = {}) {
                     }
                     const rms = Math.sqrt(sumSquares / data.length);
 
-                    const sens   = sensitivityRef.current || 0.2;
-                    const target = Math.min(0.25, Math.pow(rms * 5.0 * sens, 0.85));
+                    // Noise gate: ignore background room hum & fan noise below 0.04
+                    const NOISE_GATE = 0.038;
+                    const cleanRms = rms > NOISE_GATE ? (rms - NOISE_GATE) * 2.5 : 0;
+
+                    const sens   = (sensitivityRef.current || 1.0) * 0.4;
+                    const target = Math.min(0.18, Math.pow(cleanRms * sens, 1.2));
 
                     const prev  = levelRef.current;
-                    const alpha = target > prev ? 0.04 : 0.18;
+                    const alpha = target > prev ? 0.09 : 0.04;
                     levelRef.current = prev + (target - prev) * alpha;
 
                     rafRef.current = requestAnimationFrame(tick);

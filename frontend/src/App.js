@@ -20,7 +20,7 @@ import useSharedMic     from './hooks/useSharedMic';
 const DEFAULT_SETTINGS = {
   color: '#00f3c8',
   size: 500,
-  sensitivity: 2.8,
+  sensitivity: 0.8,
   position: { x: 0, y: 0 },      // centered
   terminalPosition: { x: 0, y: 0 },
   terminalSize: 30,
@@ -90,6 +90,25 @@ function App() {
   useEffect(() => {
     llmReplyRef.current = llmReply;
   }, [llmReply]);
+
+  /* ── 1-Time Global Autoplay Unlocker ────────────────────────── */
+  useEffect(() => {
+    const unlockAudio = () => {
+      try {
+        const dummy = new Audio();
+        dummy.play().catch(() => {});
+      } catch (_) {}
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try { window.speechSynthesis.resume(); } catch (_) {}
+      }
+    };
+    window.addEventListener('click', unlockAudio, { once: true });
+    window.addEventListener('keydown', unlockAudio, { once: true });
+    return () => {
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+    };
+  }, []);
 
   /* ── Browser Speech Synthesis (Spoken Response) ─────────────── */
   const speakText = useCallback((text) => {
