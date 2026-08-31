@@ -18,8 +18,6 @@ export default function Terminal({
   style = {},
   onPointerDown,
   onSendMessage,
-  onToggleMic,
-  isListening = false,
 }) {
   const [typedInput, setTypedInput] = React.useState('');
   const hasTranscript = !!transcript || !!interim;
@@ -101,26 +99,6 @@ export default function Terminal({
                 flex: 1,
               }}
             />
-            {onToggleMic && (
-              <button
-                type="button"
-                onClick={onToggleMic}
-                title="Click to toggle microphone"
-                style={{
-                  background: isListening ? 'rgba(0, 243, 200, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-                  border: `1px solid ${isListening ? '#00f3c8' : 'rgba(255, 255, 255, 0.2)'}`,
-                  borderRadius: '4px',
-                  color: isListening ? '#00f3c8' : '#888',
-                  cursor: 'pointer',
-                  padding: '3px 8px',
-                  fontSize: '11px',
-                  fontFamily: 'monospace',
-                  transition: 'all 0.2s',
-                }}
-              >
-                {isListening ? '🎙️ ACTIVE' : '🎙️ MIC'}
-              </button>
-            )}
           </div>
         </div>
       </div>

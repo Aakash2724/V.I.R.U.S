@@ -164,33 +164,27 @@ function App() {
     levelRef.sendUserText?.(clean);
   }, [levelRef]);
 
-  /* ── Interactive Web Speech Recognition (Browser Voice Input) ─ */
-  const [isMicActive, setIsMicActive] = useState(false);
-  const recRef = useRef(null);
-
-  const toggleMic = useCallback(() => {
+  /* ── Hands-Free Automatic Continuous Speech Recognition ────────── */
+  useEffect(() => {
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRec) {
-      alert("Speech recognition is not supported in this browser. Please use Chrome or Edge.");
-      return;
-    }
+    if (!SpeechRec) return;
 
-    if (isMicActive) {
-      if (recRef.current) {
-        try { recRef.current.stop(); } catch (_) {}
-      }
-      setIsMicActive(false);
-      setStatus('idle');
-    } else {
+    let rec = null;
+    let isDestroyed = false;
+
+    const startContinuousListening = () => {
+      if (isDestroyed) return;
       try {
-        const rec = new SpeechRec();
+        if (rec) {
+          try { rec.abort(); } catch (_) {}
+        }
+        rec = new SpeechRec();
         rec.continuous = true;
         rec.interimResults = true;
         rec.lang = 'en-US';
 
         rec.onstart = () => {
-          setIsMicActive(true);
-          setStatus('listening');
+          console.log('[VIRUS Voice] Automatic listening active.');
         };
 
         rec.onresult = (evt) => {
@@ -213,20 +207,42 @@ function App() {
         };
 
         rec.onerror = (e) => {
-          console.warn('[WebSpeech] Notice:', e.error);
+          if (e.error !== 'no-speech') {
+            console.warn('[VIRUS Voice] Notice:', e.error);
+          }
         };
 
         rec.onend = () => {
-          setIsMicActive(false);
+          if (!isDestroyed) {
+            setTimeout(startContinuousListening, 200);
+          }
         };
 
         rec.start();
-        recRef.current = rec;
       } catch (err) {
-        console.warn('[WebSpeech] Start error:', err);
+        if (!isDestroyed) {
+          setTimeout(startContinuousListening, 1000);
+        }
       }
-    }
-  }, [isMicActive, handleSendMessage]);
+    };
+
+    startContinuousListening();
+
+    const wakeMic = () => {
+      if (!isDestroyed) startContinuousListening();
+    };
+    window.addEventListener('click', wakeMic);
+    window.addEventListener('focus', wakeMic);
+
+    return () => {
+      isDestroyed = true;
+      window.removeEventListener('click', wakeMic);
+      window.removeEventListener('focus', wakeMic);
+      if (rec) {
+        try { rec.stop(); } catch (_) {}
+      }
+    };
+  }, [handleSendMessage]);
 
   /* ── Persist blob settings ──────────────────────────────────── */
   useEffect(() => {
@@ -343,8 +359,6 @@ function App() {
           status={status}
           style={{ width: '30vw', minWidth: '280px' }}
           onSendMessage={handleSendMessage}
-          onToggleMic={toggleMic}
-          isListening={isMicActive}
         />
       </DraggableWidget>
 

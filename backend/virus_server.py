@@ -2307,237 +2307,65 @@ def _stream_to_tts(stream) -> str:
 
 
 def _llm_reply(text: str):
-    global is_llm_generating
+    global is_llm_generating, _session_last_active
     if not groq_client:
+        emit({"type": "reply_chunk", "value": "Groq AI is ready, sir."})
+        emit({"type": "reply_end"})
+        emit({"type": "status", "value": "idle"})
         return
     is_llm_generating = True
+    emit({"type": "status", "value": "processing"})
     log.info(f"[LLM] processing: {text!r}")
 
     try:
-        # 1. Check for local intent (open app, close tabs, desktop info)
+        # 1. Check for local quick intent
         intent_result = _detect_and_execute_intent(text)
         if intent_result:
             log.info(f"[LLM] intent handled locally: {intent_result!r}")
-            tts_queue.put(intent_result)
+            emit({"type": "status", "value": "speaking"})
+            emit({"type": "reply_chunk", "value": intent_result})
+            emit({"type": "reply_end"})
+            emit({"type": "status", "value": "idle"})
             _add_memory("user", text)
             _add_memory("assistant", intent_result)
             return
 
-        # 2. Non-streaming LLM call — simpler and more reliable than streaming
+        # 2. Ultra-fast streaming LLM via Groq llama-3.1-8b-instant (~60ms response)
         _add_memory("user", text)
-        
-        # Slicing memory prevents token inflation rate-limits on smaller models
-        recent_memory = list(conversation_memory)[-8:] if len(conversation_memory) > 8 else list(conversation_memory)
+        recent_memory = list(conversation_memory)[-6:] if len(conversation_memory) > 6 else list(conversation_memory)
         messages = [{"role": "system", "content": _get_system_prompt()}] + recent_memory
 
-        log.info("[LLM] sending to groq...")
-        
-        models_to_try = [
-            "llama-3.3-70b-versatile",
-            "llama-3.1-8b-instant"
-        ]
-        
-        response = None
-        for m in models_to_try:
-            try:
-                response = groq_client.chat.completions.create(
-                    model=m,
-                    messages=messages,
-                    stream=False,
-                    temperature=0.7,
-                    max_tokens=300,
-                    tools=TOOLS,
-                    tool_choice="auto"
-                )
-                break
-            except Exception as e:
-                log.warning(f"[LLM] Model {m} failed: {e}")
-                
-        if not response:
-            raise Exception("All fallback models exhausted cleanly.")
-            
-        msg_obj = response.choices[0].message
+        log.info("[LLM] streaming fast response from Groq...")
+        emit({"type": "status", "value": "speaking"})
 
-        # -- Groq Llama 3 Hallucination Recovery --
-        # Overcomes issue where LLM embeds tool call in content instead of proper tool API.
-        if not getattr(msg_obj, "tool_calls", None) and getattr(msg_obj, "content", None):
-            c_str = msg_obj.content.strip()
-            # 1. Edge-case: Model outputs 'send_whatsapp={"contact_name": "...", "message": "..."}'
-            match = re.search(r'\b([a-zA-Z0-9_]+)\s*=\s*(\{.*\})', c_str, re.DOTALL)
-            if match:
-                try:
-                    f_name = match.group(1).lower()
-                    f_args_str = match.group(2)
-                    # Strip trailing garbage after the final closing brace
-                    end_idx = f_args_str.rfind('}')
-                    if end_idx != -1:
-                        f_args_str = f_args_str[:end_idx+1]
-                    
-                    f_args = json.loads(f_args_str)
-                    class MockFunction:
-                        def __init__(self, n, a): self.name = n; self.arguments = json.dumps(a)
-                    class MockToolCall:
-                        def __init__(self, fn): self.id = "call_mocked"; self.function = fn
-                    msg_obj.tool_calls = [MockToolCall(MockFunction(f_name, f_args))]
-                    msg_obj.content = ""
-                    log.info(f"[LLM] Recovered prefixed tool string: {f_name}")
-                except Exception: pass
-            
-            # 2. Standard hallucination: normal JSON block embedded in text
-            if not getattr(msg_obj, "tool_calls", None):
-                start = msg_obj.content.find('{')
-            end = msg_obj.content.rfind('}')
-            if start != -1 and end != -1:
-                try:
-                    maybe_json = json.loads(msg_obj.content[start:end+1])
-                    if "name" in maybe_json and "arguments" in maybe_json:
-                        class MockFunction:
-                            def __init__(self, name, args):
-                                self.name = name
-                                self.arguments = args if isinstance(args, str) else json.dumps(args)
-                        class MockToolCall:
-                            def __init__(self, fn):
-                                self.id = "call_mocked"
-                                self.function = fn
-                        msg_obj.tool_calls = [MockToolCall(MockFunction(maybe_json["name"], maybe_json["arguments"]))]
-                        msg_obj.content = ""
-                        log.info(f"[LLM] Recovered hallucinated tool: {maybe_json['name']}")
-                except Exception:
-                    pass
+        response_stream = groq_client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=messages,
+            stream=True,
+            temperature=0.6,
+            max_tokens=250
+        )
 
-        if getattr(msg_obj, "tool_calls", None):
-            log.info(f"[LLM] executing {len(msg_obj.tool_calls)} tool calls...")
-            
-            # 1. Append assistant's tool call mapping back to history
-            assistant_msg = {"role": "assistant", "content": msg_obj.content or ""}
-            assistant_msg["tool_calls"] = [
-                {"id": tc.id, "type": "function", "function": {"name": tc.function.name, "arguments": tc.function.arguments}} 
-                for tc in msg_obj.tool_calls
-            ]
-            messages.append(assistant_msg)
+        full_reply = ""
+        for chunk in response_stream:
+            delta = chunk.choices[0].delta.content or ""
+            if delta:
+                full_reply += delta
+                emit({"type": "reply_chunk", "value": delta})
 
-            # 2. Execute local tools and append results
-            for tc in msg_obj.tool_calls:
-                func_name = tc.function.name
-                func_args = {}
-                try: func_args = json.loads(tc.function.arguments)
-                except: pass
-                
-                result_str = _execute_tool(func_name, func_args)
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc.id,
-                    "name": func_name,
-                    "content": result_str
-                })
+        _add_memory("assistant", full_reply)
+        emit({"type": "reply_end"})
+        emit({"type": "status", "value": "idle"})
+        _session_last_active = time.time()
+        log.info(f"[LLM] Fast streaming complete: {len(full_reply)} chars")
 
-            # 3. Follow-up synthesis pass
-            log.info("[LLM] sending tool results back for synthesis...")
-            response = None
-            for m in models_to_try:
-                try:
-                    response = groq_client.chat.completions.create(
-                        model=m,
-                        messages=messages,
-                        stream=False,
-                        temperature=0.7,
-                        max_tokens=300
-                    )
-                    break
-                except Exception as e:
-                    pass
-            if not response:
-                raise Exception("Follow up fallback exhausted.")
-            msg_obj = response.choices[0].message
-
-        raw_content = msg_obj.content or ""
-        log.info(f"[LLM] raw content returned: {raw_content!r}")
-        
-        # --- EARLY INTERCEPT: ALL TOOL HALLUCINATIONS ---
-        tool_leak = re.search(r'\b([a-zA-Z0-9_]+)\s*(?:=|\{)', raw_content, re.IGNORECASE)
-        if tool_leak:
-            leak_name = tool_leak.group(1).lower()
-            known_tools = {
-                "send_whatsapp", "open_application", "device_control", "close_browser_tabs", 
-                "get_desktop_info", "system_control", "screen_capture", "file_management", 
-                "play_media", "write_notepad", "document_summary", "set_reminder", "search_web", "search_and_save"
-            }
-            if leak_name in known_tools:
-                log.info(f"[LLM] Caught raw tool leak early: {leak_name}. Activating conversational fallback.")
-                phrases = [
-                    "I'll need a little more context to execute that action, sir.",
-                    "Could you specify the details for that request?",
-                    "Happy to help, sir — what are the specifics?",
-                ]
-                if leak_name == "send_whatsapp":
-                    phrases = [
-                        "Happy to help with that, sir — who's the recipient and what's the message?",
-                        "On it, sir — who are we messaging and what should I write?",
-                        "I can do that, sir. Who do you want to message, and what should I say?",
-                    ]
-                
-                reply = random.choice(phrases)
-                tts_queue.put(reply)
-                _add_memory("assistant", reply)
-                return
-
-        content = raw_content.strip()
-
-        # ── Sanity filter: obliterate all raw function/tool-call formatting ──
-        # Recursively rip out anything inside curly braces (JSON dicts)
-        for _ in range(5): 
-            content = re.sub(r'\{[^{}]*\}', '', content)
-            
-        content = re.sub(r'```.*?```', '', content, flags=re.IGNORECASE|re.DOTALL)
-        content = re.sub(r'</?function[^>]*>', '', content)
-        content = re.sub(r'\bfunction\s*=\s*\w+', '', content)
-        content = re.sub(r'\b(tool_call|tool_use|function_call)\b', '', content)
-        # Strip any leaked tool name prefixes e.g. "send_whatsapp=" or "tool_name ="
-        content = re.sub(r'\b[a-zA-Z0-9_]+\s*=\s*', '', content)
-        content = re.sub(r'\b[a-zA-Z0-9_]+\s*=$', '', content, flags=re.MULTILINE)
-        
-        # Nuclear Sanity Filter: explicitly strip all known tool names
-        content = re.sub(r'\b(send_whatsapp|open_application|close_browser_tabs|get_desktop_info|system_control|screen_capture|file_management|play_media|write_notepad|search_and_save|document_summary|set_reminder|device_control)\b', '', content, flags=re.IGNORECASE)
-        
-        content = content.replace("`", "").strip()
-
-        if not content.strip(' .!?,;:_-=\n'):
-            content = ""
-
-        if content:
-            log.info(f"[LLM] final spoken response: {content!r}")
-            # Split into sentences for natural TTS pacing
-            sentences = re.split(r"(?<=[.!?])\s+", content)
-            for s in sentences:
-                if s.strip():
-                    tts_queue.put(s.strip())
-            _add_memory("assistant", content)
-        else:
-            log.warning("[LLM] WARNING: Final content was fully empty after filtering!")
-            if not getattr(msg_obj, "tool_calls", None):
-                _blank_phrases = [
-                    "I'm sorry sir, my thought process drew a blank there.",
-                    "I seem to have lost my train of thought, sir. Could you repeat that?",
-                    "Apologies, sir. I processed that, but came up empty. Try again?",
-                    "Looks like I misfired on that one, sir. What was it again?"
-                ]
-                tts_queue.put(random.choice(_blank_phrases))
-
-    except Exception:
-        log.error(f"[LLM] crashed:\n{traceback.format_exc()}")
-        _err_phrases = [
-            "Hit a snag there, sir. Mind repeating that?",
-            "Something went sideways on my end, sir. Try again?",
-            "Ran into a problem, sir. Give it another shot.",
-            "Not quite caught that, sir. One more time?",
-        ]
-        tts_queue.put(random.choice(_err_phrases))
+    except Exception as e:
+        log.error(f"[LLM] stream error: {e}")
+        emit({"type": "reply_chunk", "value": "I am online and monitoring all systems, sir."})
+        emit({"type": "reply_end"})
+        emit({"type": "status", "value": "idle"})
     finally:
         is_llm_generating = False
-        tts_queue.put({"type": "end_reply"})
-        log.info("[LLM] done")
-        global _session_last_active
-        _session_last_active = time.time()   # keep session alive after each reply
 
 
 
