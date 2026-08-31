@@ -29,6 +29,7 @@ export default function useVirusSocket({
     onReply,
     onReplyChunk,
     onReplyEnd,
+    onAudio = null,
     onStatus = null,
     onSysMetrics = null,
     onCricketUpdate = null,
@@ -46,6 +47,7 @@ export default function useVirusSocket({
     const onReplyRef      = useRef(onReply);
     const onReplyChunkRef = useRef(onReplyChunk);
     const onReplyEndRef   = useRef(onReplyEnd);
+    const onAudioRef      = useRef(onAudio);
     const onStatusRef     = useRef(onStatus);
     const onSysMetricsRef = useRef(onSysMetrics);
     const onCricketUpdateRef = useRef(onCricketUpdate);
@@ -55,6 +57,7 @@ export default function useVirusSocket({
     useEffect(() => { onReplyRef.current = onReply; }, [onReply]);
     useEffect(() => { onReplyChunkRef.current = onReplyChunk; }, [onReplyChunk]);
     useEffect(() => { onReplyEndRef.current = onReplyEnd; }, [onReplyEnd]);
+    useEffect(() => { onAudioRef.current = onAudio; }, [onAudio]);
     useEffect(() => { onStatusRef.current = onStatus; }, [onStatus]);
     useEffect(() => { onSysMetricsRef.current = onSysMetrics; }, [onSysMetrics]);
     useEffect(() => { onCricketUpdateRef.current = onCricketUpdate; }, [onCricketUpdate]);
@@ -106,6 +109,12 @@ export default function useVirusSocket({
                     case 'reply_end':
                         if (typeof onReplyEndRef.current === 'function') {
                             onReplyEndRef.current();
+                        }
+                        break;
+
+                    case 'audio':
+                        if (typeof onAudioRef.current === 'function' && msg.audio) {
+                            onAudioRef.current(msg.audio);
                         }
                         break;
 

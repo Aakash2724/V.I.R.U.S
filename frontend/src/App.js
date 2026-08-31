@@ -133,6 +133,45 @@ function App() {
     window.speechSynthesis.speak(utterance);
   }, []);
 
+  /* ── Neural Voice Audio Player (Edge-TTS Base64 Stream) ──────── */
+  const currentAudioRef = useRef(null);
+
+  const playNeuralAudio = useCallback((base64Audio) => {
+    if (!base64Audio) return;
+    try {
+      if (currentAudioRef.current) {
+        try {
+          currentAudioRef.current.pause();
+          currentAudioRef.current.currentTime = 0;
+        } catch (_) {}
+      }
+
+      const audio = new Audio("data:audio/mp3;base64," + base64Audio);
+      currentAudioRef.current = audio;
+
+      audio.onplay = () => {
+        console.log('[VIRUS Audio] Playing Neural Voice...');
+        setStatus('speaking');
+      };
+      audio.onended = () => {
+        setStatus('idle');
+      };
+      audio.onerror = (e) => {
+        console.warn('[VIRUS Audio] Playback error:', e);
+        setStatus('idle');
+      };
+
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(err => {
+          console.warn('[VIRUS Audio] Autoplay notice:', err);
+        });
+      }
+    } catch (err) {
+      console.warn('[VIRUS Audio] Audio initialization failed:', err);
+    }
+  }, []);
+
   /* ── WebSocket ──────────────────────────────────────────────── */
   const levelRef = useVirusSocket({
     onTranscript: useCallback(({ text, isFinal }) => {
@@ -154,9 +193,11 @@ function App() {
     onReply: useCallback((fullText) => {
       if (fullText) {
         setLlmReply(fullText);
-        speakText(fullText);
       }
-    }, [speakText]),
+    }, []),
+    onAudio: useCallback((b64) => {
+      playNeuralAudio(b64);
+    }, [playNeuralAudio]),
     onReplyChunk: useCallback(chunk => setLlmReply(prev => prev + chunk), []),
     onReplyEnd:   useCallback(() => { 
       resetNextTranscript.current = true; 

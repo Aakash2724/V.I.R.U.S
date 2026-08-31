@@ -2306,6 +2306,38 @@ def _stream_to_tts(stream) -> str:
     return full
 
 
+import edge_tts
+import base64
+import io
+
+async def _generate_neural_mp3_base64(text: str, voice: str = "en-US-GuyNeural") -> str:
+    clean = re.sub(r'[*_#`~[\]()]', '', text).strip()
+    if not clean:
+        return ""
+    try:
+        communicate = edge_tts.Communicate(clean, voice=voice, rate="+12%")
+        mp3_buf = io.BytesIO()
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                mp3_buf.write(chunk["data"])
+        mp3_buf.seek(0)
+        return base64.b64encode(mp3_buf.read()).decode("utf-8")
+    except Exception as e:
+        log.warning(f"[EdgeTTS] Async audio error: {e}")
+        return ""
+
+def _synth_and_broadcast_audio(text: str):
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        b64 = loop.run_until_complete(_generate_neural_mp3_base64(text))
+        loop.close()
+        if b64:
+            emit({"type": "audio", "audio": b64})
+    except Exception as e:
+        log.warning(f"[TTS-Neural] Synth broadcast notice: {e}")
+
+
 def _llm_reply(text: str):
     global is_llm_generating, _session_last_active
     if not groq_client:
@@ -2324,13 +2356,15 @@ def _llm_reply(text: str):
             log.info(f"[LLM] intent handled locally: {intent_result!r}")
             emit({"type": "status", "value": "speaking"})
             emit({"type": "reply_chunk", "value": intent_result})
+            emit({"type": "reply", "value": intent_result})
             emit({"type": "reply_end"})
             emit({"type": "status", "value": "idle"})
+            threading.Thread(target=_synth_and_broadcast_audio, args=(intent_result,), daemon=True).start()
             _add_memory("user", text)
             _add_memory("assistant", intent_result)
             return
 
-        # 2. Ultra-fast streaming LLM via Groq llama-3.1-8b-instant (~60ms response)
+        # 2. Ultra-fast high-accuracy streaming LLM via Groq (~60ms response)
         _add_memory("user", text)
         recent_memory = list(conversation_memory)[-6:] if len(conversation_memory) > 6 else list(conversation_memory)
         messages = [{"role": "system", "content": _get_system_prompt()}] + recent_memory
@@ -2342,7 +2376,7 @@ def _llm_reply(text: str):
             model="llama-3.1-8b-instant",
             messages=messages,
             stream=True,
-            temperature=0.6,
+            temperature=0.4,
             max_tokens=250
         )
 
@@ -2360,11 +2394,18 @@ def _llm_reply(text: str):
         _session_last_active = time.time()
         log.info(f"[LLM] Fast streaming complete: {len(full_reply)} chars")
 
+        # Broadcast ultra-realistic Neural audio to client
+        if full_reply.strip():
+            threading.Thread(target=_synth_and_broadcast_audio, args=(full_reply,), daemon=True).start()
+
     except Exception as e:
         log.error(f"[LLM] stream error: {e}")
-        emit({"type": "reply_chunk", "value": "I am online and monitoring all systems, sir."})
+        fallback_reply = "I am online and monitoring all systems, sir."
+        emit({"type": "reply_chunk", "value": fallback_reply})
+        emit({"type": "reply", "value": fallback_reply})
         emit({"type": "reply_end"})
         emit({"type": "status", "value": "idle"})
+        threading.Thread(target=_synth_and_broadcast_audio, args=(fallback_reply,), daemon=True).start()
     finally:
         is_llm_generating = False
 
