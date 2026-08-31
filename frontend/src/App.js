@@ -152,13 +152,21 @@ function App() {
     window.speechSynthesis.speak(utterance);
   }, []);
 
+  /* ── Continuous Hands-Free Speech Recognition (Never Aborts, Software Gated) ── */
+  const recognizerRef   = useRef(null);
+  const recActiveRef    = useRef(false);
+  const recDestroyedRef = useRef(false);
+  const isSpeakingRef   = useRef(false);
+  const statusRef       = useRef(status);
+
+  useEffect(() => { statusRef.current = status; }, [status]);
+
   /* ── Neural Voice Audio Player (Edge-TTS Base64 Stream) ──────── */
   const currentAudioRef = useRef(null);
 
   const playNeuralAudio = useCallback((base64Audio) => {
     if (!base64Audio) return;
     try {
-      // Stop any currently playing audio
       if (currentAudioRef.current) {
         try {
           currentAudioRef.current.pause();
@@ -166,43 +174,36 @@ function App() {
         } catch (_) {}
       }
 
-      // Pause speech recognition while V.I.R.U.S speaks (prevent mic feedback)
-      if (recognizerRef.current && recActiveRef.current) {
-        try { recognizerRef.current.abort(); } catch (_) {}
-        recActiveRef.current = false;
-      }
-
+      isSpeakingRef.current = true;
       const audio = new Audio("data:audio/mp3;base64," + base64Audio);
       audio.volume = 1.0;
       currentAudioRef.current = audio;
 
       audio.onplay = () => {
-        console.log('[VIRUS Audio] ♫ Playing Neural Voice...');
+        isSpeakingRef.current = true;
         setStatus('speaking');
       };
       audio.onended = () => {
-        setStatus('idle');
+        isSpeakingRef.current = false;
         currentAudioRef.current = null;
-        // Resume speech recognition after audio finishes
-        recActiveRef.current = false;
+        setStatus('idle');
       };
       audio.onerror = () => {
-        setStatus('idle');
+        isSpeakingRef.current = false;
         currentAudioRef.current = null;
-        recActiveRef.current = false;
+        setStatus('idle');
       };
 
       const playPromise = audio.play();
       if (playPromise !== undefined) {
         playPromise.catch(() => {
+          isSpeakingRef.current = false;
           setStatus('idle');
-          recActiveRef.current = false;
         });
       }
     } catch (err) {
-      console.warn('[VIRUS Audio] Audio init failed:', err);
+      isSpeakingRef.current = false;
       setStatus('idle');
-      recActiveRef.current = false;
     }
   }, []);
 
@@ -269,45 +270,23 @@ function App() {
     levelRef.sendUserText?.(clean);
   }, [levelRef]);
 
-  /* ── Robust Hands-Free Speech Recognition (with watchdog & audio-aware pause) ── */
-  const recognizerRef = useRef(null);
-  const recActiveRef = useRef(false);
-  const recDestroyedRef = useRef(false);
-  const watchdogRef = useRef(null);
-  const restartTimeoutRef = useRef(null);
-  const statusRef = useRef(status);
-
-  // Keep status in ref so speech recognition callbacks can read latest value
-  useEffect(() => { statusRef.current = status; }, [status]);
-
+  /* ── 24/7 Continuous Non-Stop Speech Recognition ───────────── */
   useEffect(() => {
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRec) {
-      console.warn('[VIRUS Voice] SpeechRecognition API not available in this browser.');
-      return;
-    }
+    if (!SpeechRec) return;
 
     recDestroyedRef.current = false;
 
     const startRecognition = () => {
       if (recDestroyedRef.current) return;
-
-      // Prevent double-start: if already running, skip
       if (recActiveRef.current && recognizerRef.current) return;
 
-      // Clear any pending restart
-      if (restartTimeoutRef.current) {
-        clearTimeout(restartTimeoutRef.current);
-        restartTimeoutRef.current = null;
-      }
-
-      // Abort any stale instance
-      if (recognizerRef.current) {
-        try { recognizerRef.current.abort(); } catch (_) {}
-        recognizerRef.current = null;
-      }
-
       try {
+        if (recognizerRef.current) {
+          try { recognizerRef.current.abort(); } catch (_) {}
+          recognizerRef.current = null;
+        }
+
         const rec = new SpeechRec();
         rec.continuous = true;
         rec.interimResults = true;
@@ -317,10 +296,15 @@ function App() {
 
         rec.onstart = () => {
           recActiveRef.current = true;
-          console.log('[VIRUS Voice] ✓ Listening active');
+          console.log('[VIRUS Voice] ✓ Continuous listening active');
         };
 
         rec.onresult = (evt) => {
+          // Ignore microphone when assistant is actively speaking or processing
+          if (isSpeakingRef.current || statusRef.current === 'speaking' || statusRef.current === 'processing') {
+            return;
+          }
+
           let interim = '';
           let finalText = '';
           for (let i = evt.resultIndex; i < evt.results.length; ++i) {
@@ -332,64 +316,54 @@ function App() {
               interim += r[0].transcript;
             }
           }
-          if (interim) {
+
+          if (interim && !isSpeakingRef.current) {
             setInterimTranscript(interim);
             if (statusRef.current === 'idle' || statusRef.current === 'disconnected') {
               setStatus('listening');
             }
           }
-          if (finalText) {
-            console.log('[VIRUS Voice] Recognized:', finalText);
+
+          if (finalText && !isSpeakingRef.current) {
+            console.log('[VIRUS Voice] Recognized command:', finalText);
             handleSendMessage(finalText);
           }
         };
 
         rec.onerror = (e) => {
           if (e.error === 'not-allowed') {
-            console.error('[VIRUS Voice] Microphone permission denied.');
+            console.error('[VIRUS Voice] Microphone permission denied');
             return;
           }
-          // Don't log no-speech or aborted — they are normal
-          if (e.error !== 'no-speech' && e.error !== 'aborted') {
-            console.warn('[VIRUS Voice] Error:', e.error);
-          }
-          // Mark as inactive so restart can proceed
           recActiveRef.current = false;
         };
 
         rec.onend = () => {
           recActiveRef.current = false;
-          recognizerRef.current = null;
-
-          // Schedule restart (short delay to let Chrome clean up)
+          // Instantly restart recognition session
           if (!recDestroyedRef.current) {
-            restartTimeoutRef.current = setTimeout(startRecognition, 150);
+            setTimeout(startRecognition, 100);
           }
         };
 
         rec.start();
       } catch (err) {
-        console.warn('[VIRUS Voice] Start error:', err);
         recActiveRef.current = false;
         if (!recDestroyedRef.current) {
-          restartTimeoutRef.current = setTimeout(startRecognition, 800);
+          setTimeout(startRecognition, 500);
         }
       }
     };
 
-    // Initial start
     startRecognition();
 
-    // Watchdog: every 8 seconds, check if recognition is alive. If not, restart it.
-    watchdogRef.current = setInterval(() => {
-      if (recDestroyedRef.current) return;
-      if (!recActiveRef.current) {
-        console.log('[VIRUS Voice] Watchdog: recognition died, restarting...');
+    // 2-Second Fast Watchdog: guarantees recognition never gets stuck in standby
+    const watchdog = setInterval(() => {
+      if (!recDestroyedRef.current && !recActiveRef.current) {
         startRecognition();
       }
-    }, 8000);
+    }, 2000);
 
-    // Also restart on user interaction (in case Chrome suspended it)
     const wakeMic = () => {
       if (!recDestroyedRef.current && !recActiveRef.current) {
         startRecognition();
@@ -400,8 +374,7 @@ function App() {
 
     return () => {
       recDestroyedRef.current = true;
-      clearInterval(watchdogRef.current);
-      if (restartTimeoutRef.current) clearTimeout(restartTimeoutRef.current);
+      clearInterval(watchdog);
       window.removeEventListener('click', wakeMic);
       window.removeEventListener('focus', wakeMic);
       if (recognizerRef.current) {
