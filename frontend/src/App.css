@@ -1,0 +1,314 @@
+/* ── Tauri frameless window titlebar ─────────────────────────── */
+.tauri-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  width: 100%;
+  background: linear-gradient(90deg, #010b1f 0%, #020d27 100%);
+  border-bottom: 1px solid rgba(0, 102, 255, 0.25);
+  position: relative;
+  z-index: 9999;
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+.tauri-titlebar-drag {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding-left: 14px;
+  gap: 8px;
+  cursor: move;
+}
+
+.tauri-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: rgba(0, 140, 255, 0.75);
+}
+
+.tauri-titlebar-btns {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.tauri-btn {
+  width: 46px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: rgba(200, 220, 255, 0.7);
+  font-size: 1rem;
+  transition: background 0.12s, color 0.12s;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+  line-height: 1;
+}
+
+.tauri-btn:hover {
+  background: rgba(0, 102, 255, 0.2);
+  color: #fff;
+}
+
+.tauri-btn.maximize:hover {
+  background: rgba(0, 180, 100, 0.2);
+  color: #fff;
+}
+
+.tauri-btn.close:hover {
+  background: rgba(255, 45, 85, 0.85);
+  color: #fff;
+}
+
+/* ── Original App styles ─────────────────────────────────────── */
+.sidebar {
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  gap: 32px;
+}
+
+.main-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.header-status {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.header-status h1 {
+  font-size: 2.5rem;
+  letter-spacing: 4px;
+  margin-bottom: 8px;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+}
+
+.orb-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.virus-orb {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.orb-core {
+  width: 60px;
+  height: 60px;
+  background: var(--primary);
+  border-radius: 50%;
+  box-shadow: 0 0 40px var(--primary-glow), inset 0 0 20px #fff;
+  animation: pulseGlow 3s infinite ease-in-out;
+  z-index: 10;
+}
+
+.orb-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 243, 255, 0.4);
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.1);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.ring-1 {
+  width: 90px;
+  height: 90px;
+  border-top: 2px solid var(--primary);
+  border-right: 2px solid transparent;
+  animation: spinSlow 4s linear infinite;
+}
+
+.ring-2 {
+  width: 120px;
+  height: 120px;
+  border-bottom: 2px solid var(--primary);
+  border-left: 2px solid transparent;
+  animation: spinSlow 6s linear infinite reverse;
+}
+
+.ring-3 {
+  width: 150px;
+  height: 150px;
+  border: 1px dashed rgba(0, 243, 255, 0.3);
+  animation: spinSlow 12s linear infinite;
+}
+
+.system-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--surface-border);
+}
+
+.metric {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  letter-spacing: 1px;
+}
+
+.chat-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.message-wrapper {
+  max-width: 80%;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.message-wrapper.user {
+  align-self: flex-end;
+}
+
+.message-wrapper.virus {
+  align-self: flex-start;
+}
+
+.message-header {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  letter-spacing: 1px;
+}
+
+.msg-time {
+  opacity: 0.5;
+}
+
+.message-content {
+  padding: 14px 18px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.user .message-content {
+  background: rgba(0, 243, 255, 0.1);
+  border: 1px solid rgba(0, 243, 255, 0.3);
+  border-bottom-right-radius: 2px;
+  color: #fff;
+}
+
+.virus .message-content {
+  background: rgba(17, 24, 39, 0.8);
+  border: 1px solid var(--surface-border);
+  border-bottom-left-radius: 2px;
+  color: var(--primary);
+  text-shadow: 0 0 5px rgba(0, 243, 255, 0.3);
+}
+
+.input-container {
+  padding: 20px 24px;
+  border-top: 1px solid var(--surface-border);
+  background: rgba(3, 7, 18, 0.5);
+}
+
+.input-form {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.command-input {
+  flex: 1;
+  background: rgba(17, 24, 39, 0.6);
+  border: 1px solid var(--surface-border);
+  padding: 14px 20px;
+  border-radius: 8px;
+  color: var(--primary);
+  font-size: 1rem;
+  outline: none;
+  transition: all 0.3s;
+}
+
+.command-input::placeholder {
+  color: rgba(0, 243, 255, 0.3);
+}
+
+.command-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+}
+
+.btn-icon {
+  background: rgba(17, 24, 39, 0.6);
+  border: 1px solid var(--surface-border);
+  color: var(--text-muted);
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-icon:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: rgba(0, 243, 255, 0.1);
+}
+
+.btn-icon.primary {
+  color: var(--bg-color);
+  background: var(--primary);
+  border: none;
+  box-shadow: 0 0 15px var(--primary-glow);
+}
+
+.btn-icon.primary:hover {
+  background: #fff;
+  box-shadow: 0 0 25px var(--primary-glow);
+}

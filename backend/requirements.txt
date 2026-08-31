@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+faster-whisper
+sounddevice
+numpy
+pyautogui
+pyaudio
+pystray
+Pillow
+tzdata
+soundcard

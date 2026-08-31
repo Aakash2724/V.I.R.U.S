@@ -1,0 +1,107 @@
+/* ActivityMonitor.css */
+
+.am-card {
+  width: 250px;
+  background: rgba(4, 15, 25, 1);
+  border: 1px solid rgba(0, 102, 255, 0.3);
+  border-radius: 12px;
+  padding: 16px 20px 20px;
+  box-shadow: inset 0 0 20px rgba(0, 102, 255, 0.1), 0 10px 30px rgba(0,0,0,0.6);
+  font-family: 'Rajdhani', sans-serif;
+  position: relative;
+  min-height: 250px;
+  border-radius: 12px;
+}
+
+/* Corner marks removed */
+
+.am-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 102, 255, 0.15);
+}
+
+.am-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  color: rgba(204, 224, 255, 0.6);
+  text-transform: uppercase;
+}
+
+.am-pulse {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+}
+
+.am-current-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 8px;
+  background: rgba(0, 102, 255, 0.05);
+  margin-bottom: 20px;
+  transition: all 0.3s;
+}
+
+.am-curr-icon {
+  font-size: 1.2rem;
+  filter: grayscale(0.2);
+}
+
+.am-curr-text {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.am-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.am-log-row {
+  display: flex;
+  align-items: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  line-height: 1.2;
+}
+
+.animate-fade-in {
+  animation: amFadeIn 0.3s ease-out forwards;
+}
+
+@keyframes amFadeIn {
+  from { opacity: 0; transform: translateX(-5px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.am-log-time {
+  color: rgba(204, 224, 255, 0.35);
+  font-weight: 400;
+}
+
+.am-log-sep {
+  color: rgba(0, 102, 255, 0.4);
+  margin: 0 8px;
+}
+
+.am-log-text {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Logging color states */
+.am-status-green { color: #00f3c8; }
+.am-status-blue  { color: #0066FF; }
+.am-status-amber { color: #ffb020; }
+.am-status-cyan  { color: #00a3ff; }
+.am-status-gray  { color: rgba(204, 224, 255, 0.4); }

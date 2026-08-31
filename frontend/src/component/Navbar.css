@@ -1,0 +1,82 @@
+/* Navbar.css — Floating navbar with full chamfered border on all edges */
+
+/*
+ * .navbar-frame — clipping + border shell
+ *
+ * clip-path creates the chamfered polygon shape.
+ * box-shadow (inset) draws the glowing border — because inset shadows
+ * ARE clipped to the polygon, they correctly appear on ALL six edges
+ * including left and right, unlike a CSS `border` which gets clipped away.
+ */
+.navbar-frame {
+  position: absolute;
+  top: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  height: 52px;
+  width: 90%;
+  max-width: 1200px;
+
+  background: #030f26;
+
+  /* Chamfered corners: top-left and bottom-right */
+  clip-path: polygon(20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%, 0 20px);
+
+  /* Inset shadow = border on ALL six polygon edges including left & right */
+  box-shadow:
+    inset 0 0 0 2px rgba(0, 102, 255, 0.5),
+    0 10px 30px rgba(0, 0, 0, 0.5),
+    0 0 20px rgba(0, 102, 255, 0.1);
+}
+
+/* Inner nav — plain flex strip, no clip-path */
+.futuristic-navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 40px;
+  height: 100%;
+  width: 100%;
+  background: transparent;
+}
+
+/* Logo */
+.navbar-logo {
+  display: flex;
+  align-items: center;
+}
+
+.logo-text {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: #0066FF;
+  text-shadow: 0 0 15px rgba(0, 102, 255, 0.6);
+}
+
+/* Nav links */
+.navbar-links {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.nav-link {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  color: #cce0ff;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: color 0.2s, text-shadow 0.2s;
+  padding: 4px 8px;
+}
+
+.nav-link:hover,
+.nav-link.active {
+  color: #0066FF;
+  text-shadow: 0 0 8px rgba(0, 102, 255, 0.8);
+}

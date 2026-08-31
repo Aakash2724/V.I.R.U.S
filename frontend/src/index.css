@@ -1,0 +1,127 @@
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;700&family=Orbitron:wght@400;700;900&display=swap');
+
+/* ═══════════════════════════════════════════════════════════════
+   V.I.R.U.S. — DESIGN SYSTEM v4  (Jarvis-grade)
+═══════════════════════════════════════════════════════════════ */
+:root {
+  --bg:            #01050a;
+  --surface:       rgba(0, 10, 20, 0.75);
+  --surface-hi:    rgba(0, 102, 255, 0.06);
+  --border:        rgba(0, 102, 255, 0.18);
+  --border-hi:     rgba(0, 102, 255, 0.45);
+
+  --cyan:          #0066FF;
+  --cyan-dim:      rgba(0, 102, 255, 0.45);
+  --cyan-glow:     rgba(0, 102, 255, 0.6);
+  --cyan-faint:    rgba(0, 102, 255, 0.08);
+
+  --red:           #ff2d55;
+  --amber:         #ffb020;
+  --green:         #00ff9d;
+
+  --text:          #cce0ff;
+  --text-muted:    rgba(204, 224, 255, 0.45);
+
+  --font-display:  'Orbitron', sans-serif;
+  --font-ui:       'Rajdhani', sans-serif;
+  --font-mono:     'JetBrains Mono', monospace;
+
+  --radius-sm:     8px;
+  --radius-md:     14px;
+  --radius-lg:     20px;
+
+  --shadow-deep:   0 24px 80px rgba(0, 0, 0, 0.9);
+  --shadow-glow:   0 0 30px rgba(0, 102, 255, 0.15);
+}
+
+/* ── Reset ───────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100vw; height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Background: Hex Grid ───────────────────────── */
+body {
+  background-color: var(--bg);
+  background-image: 
+    /* Hexagon pattern */
+    url("data:image/svg+xml,%3Csvg width='56' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M28 6.6L0 22.8v32.3l28 16.2 28-16.2V22.8L28 6.6zm0 2.3l26 15v30L28 69l-26-15v-30l26-15zm0 50L28 100 0 83.8h28v-25zm28-25L56 83.8h-28v-25h28z' fill='rgba(0,102,255,0.04)' fill-rule='evenodd'/%3E%3C/svg%3E");
+  background-size: 28px 50px; /* Scale down hexagons to half size */
+}
+
+/* Removed scanline overlay to keep UI completely clean and flat as requested */
+
+/* Moving scan line */
+.scanline-overlay {
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 6vh;
+  background: linear-gradient(to bottom,
+    transparent,
+    rgba(0, 102, 255, 0.05),
+    transparent);
+  animation: scanline 10s linear infinite;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+@keyframes scanline {
+  from { transform: translateY(-6vh); }
+  to   { transform: translateY(105vh); }
+}
+
+/* Corner marks on root */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  border: 1px solid rgba(0, 243, 200, 0.06);
+  pointer-events: none;
+  z-index: 9997;
+}
+
+/* ── Glass panels ────────────────────────────────────────────── */
+.glass-panel {
+  background: var(--surface);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-deep), var(--shadow-glow);
+}
+
+/* ── Typography utilities ────────────────────────────────────── */
+.glow-text   { color: var(--cyan); text-shadow: 0 0 14px var(--cyan-glow); }
+.font-mono   { font-family: var(--font-mono); }
+.font-display{ font-family: var(--font-display); }
+.font-ui     { font-family: var(--font-ui); }
+
+/* ── Scrollbar ───────────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,243,200,0.2); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,243,200,0.45); }
+
+/* ── Animations ──────────────────────────────────────────────── */
+@keyframes pulseGlow {
+  0%,100% { filter: drop-shadow(0 0 12px rgba(0,243,200,0.4)); transform: scale(1); }
+  50%     { filter: drop-shadow(0 0 28px rgba(0,243,200,0.8)); transform: scale(1.018); }
+}
+@keyframes spinSlow {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to   { transform: translate(-50%, -50%) rotate(360deg); }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes blink {
+  0%,100% { opacity: 1; }
+  50%     { opacity: 0; }
+}

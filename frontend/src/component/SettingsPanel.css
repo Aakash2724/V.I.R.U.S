@@ -1,0 +1,122 @@
+.settings-panel {
+    position: absolute;
+    top: 70px;
+    right: 320px; /* Adjust according to the Navbar SETTINGS tab visual position */
+    width: 240px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    border-radius: 12px;
+    z-index: 2000;
+    
+    background: rgba(10, 15, 25, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 100, 255, 0.2);
+    backdrop-filter: blur(20px);
+    
+    font-family: 'Orbitron', 'Inter', sans-serif;
+    color: #fff;
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.settings-body {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.setting-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.setting-title {
+    font-size: 0.8rem;
+    letter-spacing: 2px;
+    font-weight: 500;
+    color: #fff;
+    text-transform: uppercase;
+}
+
+.color-picker-wrapper {
+    width: 100%;
+    height: 36px;
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.color-input {
+    width: 200%;
+    height: 200%;
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    cursor: pointer;
+    border: none;
+    outline: none;
+    background: transparent;
+}
+
+/* Styled Range Sliders */
+.styled-range {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    outline: none;
+}
+
+.styled-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #00f3ff;
+    cursor: pointer;
+    box-shadow: 0 0 10px #00f3ff;
+}
+
+/* Primary Action Button */
+.primary-action-btn {
+    margin-top: 10px;
+    width: 100%;
+    background: linear-gradient(90deg, #00d2ff 0%, #00f3ff 100%);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 0;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
+}
+
+.primary-action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 25px rgba(0, 243, 255, 0.6);
+}
+
+.emergency-reset-btn {
+    font-size: 0.6rem;
+    color: rgba(255, 255, 255, 0.3);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    margin-top: -10px;
+}
+.emergency-reset-btn:hover {
+    color: #ff4444;
+}

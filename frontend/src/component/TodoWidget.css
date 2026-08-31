@@ -1,0 +1,143 @@
+.todo-widget {
+  background: rgba(4, 11, 24, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 102, 255, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  width: 250px;
+  box-shadow: inset 0 0 20px rgba(0, 102, 255, 0.05), 0 10px 30px rgba(0,0,0,0.6);
+  font-family: 'JetBrains Mono', monospace;
+  color: #cce0ff;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.todo-header {
+  border-bottom: 2px dashed rgba(0, 102, 255, 0.3);
+  padding-bottom: 8px;
+}
+
+.todo-title {
+  color: #0066FF;
+  font-weight: bold;
+  font-size: 0.9rem;
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 10px rgba(0, 102, 255, 0.5);
+}
+
+.todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.todo-list::-webkit-scrollbar {
+  width: 4px;
+}
+.todo-list::-webkit-scrollbar-thumb {
+  background: rgba(0, 102, 255, 0.3);
+  border-radius: 4px;
+}
+
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  background: rgba(0, 102, 255, 0.05);
+  border-left: 2px solid transparent;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.todo-item:hover {
+  background: rgba(0, 102, 255, 0.1);
+}
+
+.todo-item.done {
+  border-left-color: #00ff9d;
+  opacity: 0.6;
+}
+
+.todo-item.done .todo-text {
+  text-decoration: line-through;
+  color: #6b8fb3;
+}
+
+.todo-checkbox {
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgba(0, 102, 255, 0.6);
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.todo-item.done .todo-checkbox {
+  border-color: #00ff9d;
+}
+
+.todo-checkbox-inner {
+  width: 8px;
+  height: 8px;
+  background: #00ff9d;
+  border-radius: 1px;
+}
+
+.todo-text {
+  flex: 1;
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.todo-delete {
+  background: none;
+  border: none;
+  color: #ff2d55;
+  cursor: pointer;
+  font-size: 1rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+  padding: 0 4px;
+}
+
+.todo-item:hover .todo-delete {
+  opacity: 1;
+}
+
+.todo-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(0, 102, 255, 0.2);
+  border-radius: 4px;
+  padding: 6px 8px;
+}
+
+.todo-prompt {
+  color: #00ff9d;
+  font-size: 0.8rem;
+}
+
+.todo-input {
+  background: none;
+  border: none;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.8rem;
+  width: 100%;
+  outline: none;
+}
+.todo-input::placeholder {
+  color: rgba(204, 224, 255, 0.3);
+}

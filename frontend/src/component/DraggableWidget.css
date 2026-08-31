@@ -1,0 +1,143 @@
+/* DraggableWidget.css — context menu + drag state styles */
+
+/* Wrapper */
+.dw-wrap {
+  user-select: none;
+  position: relative;
+  transition: box-shadow 0.2s;
+}
+
+/* Moving state: dashed halo */
+.dw-wrap.dw-moving {
+  outline: 1px dashed rgba(0, 243, 200, 0.55) !important;
+  outline-offset: 4px;
+  border-radius: 16px;
+  filter: drop-shadow(0 0 20px rgba(0, 243, 200, 0.2));
+}
+
+/* Pulsing ring around widget while moving */
+.dw-move-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 18px;
+  border: 1.5px dashed rgba(0, 243, 200, 0.35);
+  pointer-events: none;
+  animation: dwRingPulse 1s ease-in-out infinite;
+  z-index: 1;
+}
+
+@keyframes dwRingPulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50%       { opacity: 1;   transform: scale(1.01); }
+}
+
+/* ── Context Menu ──────────────────────────────────────────────── */
+.dw-ctx-menu {
+  position: fixed;
+  z-index: 99999;
+  min-width: 172px;
+  background: linear-gradient(160deg,
+    rgba(2, 14, 20, 0.97) 0%,
+    rgba(0, 10, 18, 0.99) 100%);
+  border: 1px solid rgba(0, 243, 200, 0.3);
+  border-radius: 10px;
+  padding: 6px 0 8px;
+  box-shadow:
+    0 0 0 1px rgba(0, 243, 200, 0.08),
+    0 16px 50px rgba(0, 0, 0, 0.9),
+    0 0 30px rgba(0, 243, 200, 0.08);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  animation: ctxAppear 0.15s ease-out;
+  overflow: hidden;
+}
+
+/* Corner marks */
+.dw-ctx-menu::before {
+  content: '';
+  position: absolute;
+  top: 6px; left: 6px;
+  width: 8px; height: 8px;
+  border-top: 1px solid rgba(0, 243, 200, 0.4);
+  border-left: 1px solid rgba(0, 243, 200, 0.4);
+}
+.dw-ctx-menu::after {
+  content: '';
+  position: absolute;
+  bottom: 6px; right: 6px;
+  width: 8px; height: 8px;
+  border-bottom: 1px solid rgba(0, 243, 200, 0.4);
+  border-right: 1px solid rgba(0, 243, 200, 0.4);
+}
+
+@keyframes ctxAppear {
+  from { opacity: 0; transform: scale(0.94) translateY(-4px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+
+.dw-ctx-title {
+  font-family: 'Rajdhani', 'JetBrains Mono', monospace;
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  color: rgba(0, 243, 200, 0.4);
+  text-transform: uppercase;
+  padding: 4px 14px 6px;
+}
+
+.dw-ctx-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,243,200,0.2), transparent);
+  margin: 0 10px 4px;
+}
+
+.dw-ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 8px 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.73rem;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  color: rgba(180, 230, 220, 0.75);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+}
+
+.dw-ctx-item svg {
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.dw-ctx-item:hover {
+  background: rgba(0, 243, 200, 0.08);
+  color: #00f3c8;
+}
+
+.dw-ctx-item:hover svg {
+  opacity: 1;
+}
+
+/* Save button — green accent */
+.dw-ctx-save {
+  color: rgba(0, 255, 157, 0.8) !important;
+}
+.dw-ctx-save:hover {
+  background: rgba(0, 255, 157, 0.08) !important;
+  color: #00ff9d !important;
+}
+
+/* Reset button — amber accent */
+.dw-ctx-reset {
+  color: rgba(255, 176, 32, 0.65) !important;
+}
+.dw-ctx-reset:hover {
+  background: rgba(255, 176, 32, 0.08) !important;
+  color: #ffb020 !important;
+}

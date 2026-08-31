@@ -1,0 +1,395 @@
+/* CentralHUD.css — Iron Man / Jarvis central UI decorations */
+
+/* ── Root: fills the parent flex container completely ── */
+.chud-root {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* ═══════════════════════════════════════════════════════
+   GHOST CLOCK — huge translucent clock behind the blob
+═══════════════════════════════════════════════════════ */
+.chud-ghost-clock {
+  position: absolute;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  z-index: 0;
+  animation: ghostPulse 6s ease-in-out infinite;
+}
+
+.chud-ghost-hh,
+.chud-ghost-mm {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(140px, 18vw, 260px);
+  font-weight: 900;
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(0, 243, 200, 0.07);
+  letter-spacing: -6px;
+  user-select: none;
+}
+
+.chud-ghost-sep {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(100px, 13vw, 180px);
+  font-weight: 900;
+  color: transparent;
+  -webkit-text-stroke: 1px rgba(0, 243, 200, 0.05);
+  align-self: flex-start;
+  padding-top: 12px;
+  animation: ghostBlink 1s step-end infinite;
+}
+
+@keyframes ghostPulse {
+
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+
+  50% {
+    opacity: 1.0;
+  }
+}
+
+@keyframes ghostBlink {
+
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   ORBITAL RINGS
+═══════════════════════════════════════════════════════ */
+.chud-rings {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.chud-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid transparent;
+}
+
+:root {
+  --blob-diameter: 240px;
+  --ring-gap: 38px;
+  /* ≈ 1cm at 96 DPI */
+  --ring-base: calc(var(--blob-diameter) + (var(--ring-gap) * 2));
+}
+
+/* Ring 1 — innermost */
+.chud-ring-1 {
+  width: var(--ring-base);
+  /* 316px */
+  height: var(--ring-base);
+  border-top: 2px solid rgba(0, 102, 255, 0.50);
+  border-right: 2px solid rgba(0, 102, 255, 0.20);
+  border-bottom: 1px solid transparent;
+  border-left: 1px solid transparent;
+  animation: spinCW 5s linear infinite;
+  box-shadow: 0 0 12px rgba(0, 102, 255, 0.15);
+}
+
+/* Ring 4 — just outside ring 1 */
+.chud-ring-4 {
+  width: calc(var(--ring-base) + 10px);
+  /* 326px */
+  height: calc(var(--ring-base) + 10px);
+  border-right: 2px solid rgba(0, 102, 255, 0.3);
+  border-top: 1px solid transparent;
+  border-bottom: 1px solid transparent;
+  border-left: 1px solid transparent;
+  animation: spinCCW 7s linear infinite;
+}
+
+/* Ring 2 */
+.chud-ring-2 {
+  width: calc(var(--ring-base) + 20px);
+  /* 336px */
+  height: calc(var(--ring-base) + 20px);
+  border-bottom: 2px solid rgba(0, 102, 255, 0.30);
+  border-left: 2px solid rgba(0, 102, 255, 0.15);
+  border-top: 1px solid transparent;
+  border-right: 1px solid transparent;
+  animation: spinCCW 9s linear infinite;
+}
+
+/* Ring 3 — outermost, dashed */
+.chud-ring-3 {
+  width: calc(var(--ring-base) + 44px);
+  /* 360px */
+  height: calc(var(--ring-base) + 44px);
+  border: 1px dashed rgba(0, 102, 255, 0.2);
+  animation: spinCW 20s linear infinite;
+}
+
+@keyframes spinCW {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+@keyframes spinCCW {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+
+  to {
+    transform: translate(-50%, -50%) rotate(-360deg);
+  }
+}
+
+/* Override: rings positioned relative to center div */
+.chud-ring {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* ═══════════════════════════════════════════════════════
+   TOP STRIP — main clock display above the blob
+═══════════════════════════════════════════════════════ */
+.chud-top-strip {
+  position: absolute;
+  top: 12%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  z-index: 10;
+}
+
+.chud-clock-main {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.chud-hh,
+.chud-mm {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(36px, 4.5vw, 64px);
+  font-weight: 700;
+  color: #0066FF;
+  text-shadow:
+    0 0 20px rgba(0, 102, 255, 0.8),
+    0 0 50px rgba(0, 102, 255, 0.3);
+  letter-spacing: 3px;
+  line-height: 1;
+}
+
+.chud-colon {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(28px, 3.5vw, 52px);
+  font-weight: 700;
+  color: rgba(0, 102, 255, 0.6);
+  animation: colonBlink 1s step-end infinite;
+  padding: 0 2px;
+  line-height: 1;
+  align-self: flex-start;
+  padding-top: 6px;
+}
+
+@keyframes colonBlink {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.15;
+  }
+}
+
+.chud-ss {
+  font-family: 'Orbitron', sans-serif;
+  font-size: clamp(14px, 1.8vw, 24px);
+  font-weight: 400;
+  color: rgba(0, 102, 255, 0.5);
+  letter-spacing: 2px;
+  align-self: flex-end;
+  padding-bottom: 6px;
+}
+
+.chud-date-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(10px, 1.1vw, 14px);
+  letter-spacing: 0.2em;
+  color: rgba(0, 102, 255, 0.5);
+  text-transform: uppercase;
+}
+
+.chud-sep-dot {
+  color: rgba(0, 243, 200, 0.3);
+  font-size: 1.2em;
+}
+
+/* ═══════════════════════════════════════════════════════
+   BOTTOM STRIP — status + metrics below blob
+═══════════════════════════════════════════════════════ */
+.chud-bottom-strip {
+  position: absolute;
+  bottom: 14%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  z-index: 10;
+  white-space: nowrap;
+}
+
+.chud-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: clamp(10px, 1vw, 13px);
+  letter-spacing: 0.25em;
+  color: rgba(0, 200, 160, 0.5);
+  text-transform: uppercase;
+}
+
+.chud-status-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(0, 243, 200, 0.4);
+  box-shadow: 0 0 6px rgba(0, 243, 200, 0.4);
+  flex-shrink: 0;
+  animation: dotFlicker 2.5s ease-in-out infinite;
+}
+
+@keyframes dotFlicker {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.chud-metrics {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid rgba(0, 243, 200, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(0, 243, 200, 0.02);
+}
+
+.chud-metric {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(8px, 0.75vw, 11px);
+  letter-spacing: 0.1em;
+  color: rgba(0, 200, 160, 0.35);
+  text-transform: uppercase;
+  padding: 6px 16px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.chud-metric b {
+  display: block;
+  color: rgba(0, 243, 200, 0.65);
+  font-weight: 700;
+  letter-spacing: 0.15em;
+}
+
+.chud-metric-div {
+  width: 1px;
+  height: 32px;
+  background: rgba(0, 243, 200, 0.12);
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════════
+   CORNER MARKS — absolute to the viewport
+═══════════════════════════════════════════════════════ */
+.chud-corner {
+  position: fixed;
+  width: 22px;
+  height: 22px;
+  border-color: rgba(0, 243, 200, 0.3);
+  border-style: solid;
+  pointer-events: none;
+  z-index: 9995;
+}
+
+.chud-corner-tl {
+  top: 12px;
+  left: 12px;
+  border-width: 1.5px 0 0 1.5px;
+  border-radius: 4px 0 0 0;
+  animation: cornerGlow 4s ease-in-out infinite;
+}
+
+.chud-corner-tr {
+  top: 12px;
+  right: 12px;
+  border-width: 1.5px 1.5px 0 0;
+  border-radius: 0 4px 0 0;
+  animation: cornerGlow 4s ease-in-out infinite 1s;
+}
+
+.chud-corner-bl {
+  bottom: 12px;
+  left: 12px;
+  border-width: 0 0 1.5px 1.5px;
+  border-radius: 0 0 0 4px;
+  animation: cornerGlow 4s ease-in-out infinite 2s;
+}
+
+.chud-corner-br {
+  bottom: 12px;
+  right: 12px;
+  border-width: 0 1.5px 1.5px 0;
+  border-radius: 0 0 4px 0;
+  animation: cornerGlow 4s ease-in-out infinite 3s;
+}
+
+@keyframes cornerGlow {
+
+  0%,
+  100% {
+    border-color: rgba(0, 243, 200, 0.25);
+  }
+
+  50% {
+    border-color: rgba(0, 243, 200, 0.6);
+  }
+}
