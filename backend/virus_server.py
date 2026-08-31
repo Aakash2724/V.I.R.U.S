@@ -1282,20 +1282,34 @@ def _barge_in_monitor():
 def _mic_read_thread():
     global level_value, is_speaking
     
-    device_idx_raw = os.getenv("INPUT_DEVICE")
-    device_idx = int(device_idx_raw) if device_idx_raw is not None else 1
-    
-    p_audio = pyaudio.PyAudio()
-    mic_stream = p_audio.open(
-        format=pyaudio.paInt16,
-        channels=1,
-        rate=CAPTURE_RATE,
-        input=True,
-        input_device_index=device_idx,
-        frames_per_buffer=CAPTURE_BLOCK_SIZE
-    )
-    
-    print(f"[VIRUS] Mic open (PyAudio Blocking Thread) — {CAPTURE_RATE} Hz, {BLOCK_MS}ms blocks")
+    if pyaudio is None:
+        log.info("[VIRUS] PyAudio unavailable. Local microphone disabled.")
+        return
+
+    try:
+        p_audio = pyaudio.PyAudio()
+        device_count = p_audio.get_device_count()
+        if device_count == 0:
+            log.info("[VIRUS] No local audio input devices found (running in cloud mode).")
+            return
+            
+        device_idx_raw = os.getenv("INPUT_DEVICE")
+        device_idx = int(device_idx_raw) if device_idx_raw is not None else None
+        if device_idx is not None and (device_idx < 0 or device_idx >= device_count):
+            device_idx = None
+
+        mic_stream = p_audio.open(
+            format=pyaudio.paInt16,
+            channels=1,
+            rate=CAPTURE_RATE,
+            input=True,
+            input_device_index=device_idx,
+            frames_per_buffer=CAPTURE_BLOCK_SIZE
+        )
+        print(f"[VIRUS] Mic open (PyAudio Blocking Thread) — {CAPTURE_RATE} Hz, {BLOCK_MS}ms blocks")
+    except Exception as e:
+        log.warning(f"[VIRUS] Could not open local microphone: {e}. Running in cloud mode.")
+        return
     
     while True:
         try:

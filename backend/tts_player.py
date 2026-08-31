@@ -7,13 +7,19 @@ is received instantly while audio is playing.
 """
 import sys, asyncio, os, json, time, tempfile, traceback, threading
 
-os.environ.setdefault("SDL_AUDIODRIVER", "directsound")
+if sys.platform == "win32":
+    os.environ.setdefault("SDL_AUDIODRIVER", "directsound")
+else:
+    os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
-import pygame
 import edge_tts
 
-pygame.mixer.pre_init(44100, -16, 1, 1024)
-pygame.mixer.init()
+try:
+    import pygame
+    pygame.mixer.pre_init(44100, -16, 1, 1024)
+    pygame.mixer.init()
+except Exception as e:
+    pygame = None
 
 _stop_event = threading.Event()   # set to interrupt current playback
 _play_lock  = threading.Lock()    # only one play at a time
@@ -40,22 +46,25 @@ def _play_thread(text: str):
                 send({"type": "error", "msg": "mp3 not generated"})
                 return
 
-            pygame.mixer.music.load(tmp)
-            pygame.mixer.music.play()
-            send({"type": "playing"})
+            if pygame and pygame.mixer.get_init():
+                pygame.mixer.music.load(tmp)
+                pygame.mixer.music.play()
+                send({"type": "playing"})
 
-            while pygame.mixer.music.get_busy():
-                if _stop_event.is_set():
-                    pygame.mixer.music.stop()
-                    break
-                time.sleep(0.03)
+                while pygame.mixer.music.get_busy():
+                    if _stop_event.is_set():
+                        pygame.mixer.music.stop()
+                        break
+                    time.sleep(0.03)
 
             send({"type": "done"})
 
         except Exception:
             send({"type": "error", "msg": traceback.format_exc()})
         finally:
-            pygame.mixer.music.stop()
+            if pygame and pygame.mixer.get_init():
+                try: pygame.mixer.music.stop()
+                except Exception: pass
             try:
                 os.remove(tmp)
             except Exception:

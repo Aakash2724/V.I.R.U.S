@@ -12,8 +12,19 @@ import { useState, useEffect, useRef, useCallback } from 'react';
  * 
  * Auto-reconnects with exponential backoff.
  */
+const getDefaultWsUrl = () => {
+    if (typeof window !== 'undefined' && window.location && window.location.host) {
+        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        if (window.location.port === '3000') {
+            return `${proto}//${window.location.hostname}:8000/ws`;
+        }
+        return `${proto}//${window.location.host}/ws`;
+    }
+    return 'ws://127.0.0.1:8000/ws';
+};
+
 export default function useVirusSocket({ 
-    url = 'ws://127.0.0.1:8000/ws', 
+    url = null, 
     onTranscript, 
     onReply,
     onReplyChunk,
@@ -52,7 +63,8 @@ export default function useVirusSocket({
     const connect = useCallback(() => {
         if (!mountedRef.current) return;
 
-        const ws = new WebSocket(url);
+        const targetUrl = url || getDefaultWsUrl();
+        const ws = new WebSocket(targetUrl);
         wsRef.current = ws;
 
         ws.onopen = () => {
