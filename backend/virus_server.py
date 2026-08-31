@@ -2831,6 +2831,16 @@ async def ws_endpoint(ws: WebSocket):
     except WebSocketDisconnect:
         if ws in clients:
             clients.remove(ws)
+# ─── HEALTH CHECK (for UptimeRobot / monitoring) ─────────────────────────
+@app.get("/api/health")
+async def health_check():
+    return {
+        "status": "online",
+        "service": "V.I.R.U.S",
+        "ai": _cached_ai_type or "not_configured",
+        "models": len(_cached_groq_models or []),
+        "clients": len(clients)
+    }
 
 # ─── ENTRY POINT ─────────────────────────────────────────────────────────
 if __name__ == "__main__":
