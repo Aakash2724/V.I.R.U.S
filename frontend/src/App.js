@@ -164,65 +164,69 @@ function App() {
     levelRef.sendUserText?.(clean);
   }, [levelRef]);
 
-  /* ── Continuous Web Speech Recognition (Browser Voice Input) ─ */
-  useEffect(() => {
+  /* ── Interactive Web Speech Recognition (Browser Voice Input) ─ */
+  const [isMicActive, setIsMicActive] = useState(false);
+  const recRef = useRef(null);
+
+  const toggleMic = useCallback(() => {
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRec) return;
-
-    let rec;
-    let shouldRestart = true;
-
-    try {
-      rec = new SpeechRec();
-      rec.continuous = true;
-      rec.interimResults = true;
-      rec.lang = 'en-US';
-
-      rec.onresult = (evt) => {
-        let interim = '';
-        let final = '';
-        for (let i = evt.resultIndex; i < evt.results.length; ++i) {
-          if (evt.results[i].isFinal) {
-            final += evt.results[i][0].transcript;
-          } else {
-            interim += evt.results[i][0].transcript;
-          }
-        }
-        if (interim) {
-          setInterimTranscript(interim);
-          setStatus('listening');
-        }
-        if (final) {
-          handleSendMessage(final);
-        }
-      };
-
-      rec.onerror = (e) => {
-        if (e.error !== 'no-speech') {
-          console.warn('[WebSpeech] Recognition notice:', e.error);
-        }
-      };
-
-      rec.onend = () => {
-        if (shouldRestart) {
-          setTimeout(() => {
-            try { rec.start(); } catch (_) {}
-          }, 300);
-        }
-      };
-
-      rec.start();
-    } catch (err) {
-      console.warn('[WebSpeech] SpeechRecognition init:', err);
+    if (!SpeechRec) {
+      alert("Speech recognition is not supported in this browser. Please use Chrome or Edge.");
+      return;
     }
 
-    return () => {
-      shouldRestart = false;
-      if (rec) {
-        try { rec.stop(); } catch (_) {}
+    if (isMicActive) {
+      if (recRef.current) {
+        try { recRef.current.stop(); } catch (_) {}
       }
-    };
-  }, [handleSendMessage]);
+      setIsMicActive(false);
+      setStatus('idle');
+    } else {
+      try {
+        const rec = new SpeechRec();
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.lang = 'en-US';
+
+        rec.onstart = () => {
+          setIsMicActive(true);
+          setStatus('listening');
+        };
+
+        rec.onresult = (evt) => {
+          let interim = '';
+          let final = '';
+          for (let i = evt.resultIndex; i < evt.results.length; ++i) {
+            if (evt.results[i].isFinal) {
+              final += evt.results[i][0].transcript;
+            } else {
+              interim += evt.results[i][0].transcript;
+            }
+          }
+          if (interim) {
+            setInterimTranscript(interim);
+            setStatus('listening');
+          }
+          if (final && final.trim()) {
+            handleSendMessage(final.trim());
+          }
+        };
+
+        rec.onerror = (e) => {
+          console.warn('[WebSpeech] Notice:', e.error);
+        };
+
+        rec.onend = () => {
+          setIsMicActive(false);
+        };
+
+        rec.start();
+        recRef.current = rec;
+      } catch (err) {
+        console.warn('[WebSpeech] Start error:', err);
+      }
+    }
+  }, [isMicActive, handleSendMessage]);
 
   /* ── Persist blob settings ──────────────────────────────────── */
   useEffect(() => {
@@ -339,6 +343,8 @@ function App() {
           status={status}
           style={{ width: '30vw', minWidth: '280px' }}
           onSendMessage={handleSendMessage}
+          onToggleMic={toggleMic}
+          isListening={isMicActive}
         />
       </DraggableWidget>
 

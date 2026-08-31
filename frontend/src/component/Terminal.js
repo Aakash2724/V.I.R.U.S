@@ -18,6 +18,8 @@ export default function Terminal({
   style = {},
   onPointerDown,
   onSendMessage,
+  onToggleMic,
+  isListening = false,
 }) {
   const [typedInput, setTypedInput] = React.useState('');
   const hasTranscript = !!transcript || !!interim;
@@ -64,61 +66,62 @@ export default function Terminal({
             {mode.label}
           </span>
         </div>
-        <div className="terminal-body" style={{ display: 'flex', alignItems: 'center' }}>
-          <div
-            className="terminal-prompt"
-            style={{
-              color: hasTranscript ? '#ff2d55' : 'rgba(255,45,85,0.3)',
-              textShadow: hasTranscript ? '0 0 12px #ff2d55' : 'none',
-              marginRight: '8px'
-            }}
-          >
-            {'>'}
-          </div>
-          <div className="terminal-text-area" style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-            {transcript && (
-              <span
-                className="terminal-text speech"
-                style={{ color: '#0066FF', textShadow: '0 0 10px rgba(0, 102, 255, 0.6)' }}
-              >
-                {transcript}
-              </span>
-            )}
-            {interim && (
-              <span
-                className="terminal-text speech-interim"
-                style={{ color: '#00d2ff', fontStyle: 'italic', opacity: 0.85 }}
-              >
-                {interim}
-              </span>
-            )}
-            {!transcript && !interim && onSendMessage && (
-              <input
-                type="text"
-                value={typedInput}
-                onChange={(e) => setTypedInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Speak or type a command..."
+        <div className="terminal-body" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {transcript && (
+            <div
+              className="terminal-text speech"
+              style={{ color: '#00d2ff', textShadow: '0 0 10px rgba(0, 210, 255, 0.6)', fontSize: '13px' }}
+            >
+              {transcript}
+            </div>
+          )}
+          {interim && (
+            <div
+              className="terminal-text speech-interim"
+              style={{ color: '#00f3c8', fontStyle: 'italic', opacity: 0.85, fontSize: '13px' }}
+            >
+              {interim}
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+            <span style={{ color: '#00f3c8', fontWeight: 'bold' }}>{'>'}</span>
+            <input
+              type="text"
+              value={typedInput}
+              onChange={(e) => setTypedInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Speak aloud or type a command..."
+              style={{
+                background: 'transparent',
+                border: 'none',
+                outline: 'none',
+                color: '#00f3c8',
+                fontFamily: 'inherit',
+                fontSize: '14px',
+                flex: 1,
+              }}
+            />
+            {onToggleMic && (
+              <button
+                type="button"
+                onClick={onToggleMic}
+                title="Click to toggle microphone"
                 style={{
-                  background: 'transparent',
-                  border: 'none',
-                  outline: 'none',
-                  color: '#00f3c8',
-                  fontFamily: 'inherit',
-                  fontSize: '14px',
-                  width: '100%',
+                  background: isListening ? 'rgba(0, 243, 200, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                  border: `1px solid ${isListening ? '#00f3c8' : 'rgba(255, 255, 255, 0.2)'}`,
+                  borderRadius: '4px',
+                  color: isListening ? '#00f3c8' : '#888',
+                  cursor: 'pointer',
+                  padding: '3px 8px',
+                  fontSize: '11px',
+                  fontFamily: 'monospace',
+                  transition: 'all 0.2s',
                 }}
-              />
+              >
+                {isListening ? '🎙️ ACTIVE' : '🎙️ MIC'}
+              </button>
             )}
           </div>
-          <div
-            className="terminal-cursor"
-            style={{
-              backgroundColor: glowColor,
-              boxShadow: `0 0 10px ${glowColor}`,
-              opacity: (status === 'listening' || hasTranscript) ? 1 : 0.15,
-            }}
-          />
         </div>
       </div>
 

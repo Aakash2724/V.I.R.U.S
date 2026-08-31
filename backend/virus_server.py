@@ -2634,6 +2634,30 @@ def _tts_worker():
             except queue.Empty:
                 continue
 
+def _tts_worker():
+    global is_playing_audio, player_proc
+
+    if not HAS_PHYSICAL_AUDIO:
+        log.info("[TTS] Cloud server mode active — streaming text directly to WebSocket.")
+        while True:
+            item = tts_queue.get()
+            if item is None:
+                break
+            if isinstance(item, dict):
+                if item.get("type") == "error":
+                    emit({"type": "reply_chunk", "value": item.get("message", "Error") + " "})
+                    continue
+                if item.get("type") == "end_reply":
+                    emit({"type": "reply_end"})
+                    emit({"type": "status", "value": "idle"})
+                    continue
+            text = str(item).strip()
+            if text:
+                emit({"type": "status", "value": "speaking"})
+                emit({"type": "reply_chunk", "value": text + " "})
+                time.sleep(0.04)
+        return
+
     try:
         player_proc = _start_player()
     except Exception:
