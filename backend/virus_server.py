@@ -2348,22 +2348,58 @@ def _synth_and_broadcast_audio(text: str):
         log.warning(f"[TTS-Neural] Synth broadcast notice: {e}")
 
 
+def _get_ai_client():
+    """Dynamically loads and validates Groq or Gemini API keys from all potential .env locations."""
+    global groq_client
+    # 1. Search all possible .env paths
+    env_paths = [
+        pathlib.Path(__file__).parent / ".env",
+        pathlib.Path(__file__).parent.parent / ".env",
+        pathlib.Path.cwd() / ".env",
+        pathlib.Path("/home/ubuntu/V.I.R.U.S/backend/.env"),
+        pathlib.Path("/home/ubuntu/V.I.R.U.S/.env")
+    ]
+    for p in env_paths:
+        if p.exists():
+            load_dotenv(dotenv_path=p, override=True)
+            break
+
+    groq_key = os.getenv("GROQ_API_KEY", "").strip()
+    if groq_key and len(groq_key) > 10:
+        try:
+            from groq import Groq
+            groq_client = Groq(api_key=groq_key, max_retries=2)
+            return ("groq", groq_client)
+        except Exception as e:
+            log.warning(f"[AI] Groq init notice: {e}")
+
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    if gemini_key and len(gemini_key) > 10:
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=gemini_key)
+            model = genai.GenerativeModel(
+                model_name="gemini-1.5-flash",
+                system_instruction=_get_system_prompt()
+            )
+            return ("gemini", model)
+        except Exception as e:
+            log.warning(f"[AI] Gemini init notice: {e}")
+
+    return (None, None)
+
+
 def _llm_reply(text: str):
     global is_llm_generating, _session_last_active
-    if not groq_client:
-        emit({"type": "reply_chunk", "value": "Groq AI is ready, sir."})
-        emit({"type": "reply_end"})
-        emit({"type": "status", "value": "idle"})
-        return
     is_llm_generating = True
     emit({"type": "status", "value": "processing"})
-    log.info(f"[LLM] processing: {text!r}")
+    log.info(f"[LLM] processing request: {text!r}")
 
     try:
-        # 1. Check for local quick intent
+        # 1. Check for quick local intents
         intent_result = _detect_and_execute_intent(text)
         if intent_result:
-            log.info(f"[LLM] intent handled locally: {intent_result!r}")
+            log.info(f"[LLM] Intent handled locally: {intent_result!r}")
             emit({"type": "status", "value": "speaking"})
             emit({"type": "reply_chunk", "value": intent_result})
             emit({"type": "reply", "value": intent_result})
@@ -2374,48 +2410,94 @@ def _llm_reply(text: str):
             _add_memory("assistant", intent_result)
             return
 
-        # 2. Ultra-fast high-accuracy streaming LLM via Groq (~60ms response)
+        # 2. Acquire best available AI client
+        client_type, client = _get_ai_client()
+        if not client:
+            err_msg = "Please verify your GROQ_API_KEY or GEMINI_API_KEY in backend/.env on the server, sir."
+            log.error("[LLM] No valid API key found in environment.")
+            emit({"type": "reply_chunk", "value": err_msg})
+            emit({"type": "reply", "value": err_msg})
+            emit({"type": "reply_end"})
+            emit({"type": "status", "value": "idle"})
+            threading.Thread(target=_synth_and_broadcast_audio, args=(err_msg,), daemon=True).start()
+            return
+
         _add_memory("user", text)
+
+        # 3. Sanitize conversation history
+        clean_history = []
         recent_memory = list(conversation_memory)[-6:] if len(conversation_memory) > 6 else list(conversation_memory)
-        messages = [{"role": "system", "content": _get_system_prompt()}] + recent_memory
-
-        log.info("[LLM] streaming fast response from Groq...")
-        emit({"type": "status", "value": "speaking"})
-
-        response_stream = groq_client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=messages,
-            stream=True,
-            temperature=0.4,
-            max_tokens=250
-        )
+        for m in recent_memory:
+            if isinstance(m, dict) and m.get("role") in ("user", "assistant") and m.get("content"):
+                c = str(m["content"]).strip()
+                if c:
+                    clean_history.append({"role": m["role"], "content": c})
 
         full_reply = ""
-        for chunk in response_stream:
-            delta = chunk.choices[0].delta.content or ""
-            if delta:
-                full_reply += delta
-                emit({"type": "reply_chunk", "value": delta})
+        emit({"type": "status", "value": "speaking"})
 
-        _add_memory("assistant", full_reply)
-        emit({"type": "reply", "value": full_reply})
-        emit({"type": "reply_end"})
-        emit({"type": "status", "value": "idle"})
-        _session_last_active = time.time()
-        log.info(f"[LLM] Fast streaming complete: {len(full_reply)} chars")
+        # 4. Stream response from Groq (Llama-3.3-70B flagship / Llama-3.1-8B)
+        if client_type == "groq":
+            messages = [{"role": "system", "content": _get_system_prompt()}] + clean_history
+            models_to_try = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
+            response_stream = None
 
-        # Broadcast ultra-realistic Neural audio to client
-        if full_reply.strip():
-            threading.Thread(target=_synth_and_broadcast_audio, args=(full_reply,), daemon=True).start()
+            for m in models_to_try:
+                try:
+                    log.info(f"[LLM] Trying Groq model: {m} (temp=0.3)...")
+                    response_stream = client.chat.completions.create(
+                        model=m,
+                        messages=messages,
+                        stream=True,
+                        temperature=0.3,
+                        max_tokens=300
+                    )
+                    break
+                except Exception as e:
+                    log.warning(f"[LLM] Groq model {m} failed: {e}")
+
+            if not response_stream:
+                raise Exception("Groq completion models failed.")
+
+            for chunk in response_stream:
+                delta = chunk.choices[0].delta.content or ""
+                if delta:
+                    full_reply += delta
+                    emit({"type": "reply_chunk", "value": delta})
+
+        elif client_type == "gemini":
+            log.info("[LLM] Generating with Google Gemini 1.5 Flash...")
+            chat_history = []
+            for h in clean_history[:-1]:
+                chat_history.append({"role": "user" if h["role"] == "user" else "model", "parts": [h["content"]]})
+            chat = client.start_chat(history=chat_history)
+            gemini_response = chat.send_message(text, stream=True)
+            for chunk in gemini_response:
+                txt = chunk.text
+                if txt:
+                    full_reply += txt
+                    emit({"type": "reply_chunk", "value": txt})
+
+        clean_reply = full_reply.strip()
+        if clean_reply:
+            _add_memory("assistant", clean_reply)
+            emit({"type": "reply", "value": clean_reply})
+            emit({"type": "reply_end"})
+            emit({"type": "status", "value": "idle"})
+            _session_last_active = time.time()
+            log.info(f"[LLM] Stream complete: {len(clean_reply)} chars")
+            threading.Thread(target=_synth_and_broadcast_audio, args=(clean_reply,), daemon=True).start()
+        else:
+            raise Exception("AI returned empty content.")
 
     except Exception as e:
-        log.error(f"[LLM] stream error: {e}")
-        fallback_reply = "I am online and monitoring all systems, sir."
-        emit({"type": "reply_chunk", "value": fallback_reply})
-        emit({"type": "reply", "value": fallback_reply})
+        log.error(f"[LLM] Generation error:\n{traceback.format_exc()}")
+        fallback = "I encountered an issue processing that query, sir. Please check the backend log or API key."
+        emit({"type": "reply_chunk", "value": fallback})
+        emit({"type": "reply", "value": fallback})
         emit({"type": "reply_end"})
         emit({"type": "status", "value": "idle"})
-        threading.Thread(target=_synth_and_broadcast_audio, args=(fallback_reply,), daemon=True).start()
+        threading.Thread(target=_synth_and_broadcast_audio, args=(fallback,), daemon=True).start()
     finally:
         is_llm_generating = False
 
