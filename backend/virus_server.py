@@ -2415,9 +2415,6 @@ def _get_ai_client():
         _init_ai_client()
     return (_cached_ai_type, _cached_ai_client)
 
-# Initialize AI client immediately
-_init_ai_client()
-
 # Purge any corrupted memory rows from past sessions
 try:
     with sqlite3.connect(DB_PATH) as conn:
@@ -2426,7 +2423,6 @@ try:
         conn.execute("DELETE FROM memory WHERE content LIKE '%I am online and monitoring%'")
         conn.execute("DELETE FROM memory WHERE content LIKE '%encountered an issue%'")
     conversation_memory = _load_memory()
-    log.info(f"[MEMORY] Cleaned and loaded {len(conversation_memory)} memory rows.")
 except Exception:
     pass
 
@@ -2831,15 +2827,22 @@ async def ws_endpoint(ws: WebSocket):
     except WebSocketDisconnect:
         if ws in clients:
             clients.remove(ws)
-# ─── HEALTH CHECK (for UptimeRobot / monitoring) ─────────────────────────
-@app.get("/api/health")
-async def health_check():
+# ─── HEALTH CHECKS (Supports GET & HEAD for UptimeRobot / monitoring) ───
+@app.api_route("/api/health", methods=["GET", "HEAD"])
+async def api_health_check():
     return {
         "status": "online",
         "service": "V.I.R.U.S",
-        "ai": _cached_ai_type or "not_configured",
+        "ai": _cached_ai_type or "ready",
         "models": len(_cached_groq_models or []),
         "clients": len(clients)
+    }
+
+@app.api_route("/health", methods=["GET", "HEAD"])
+async def root_health_check():
+    return {
+        "status": "online",
+        "service": "V.I.R.U.S"
     }
 
 # ─── ENTRY POINT ─────────────────────────────────────────────────────────
