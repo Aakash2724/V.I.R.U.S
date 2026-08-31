@@ -53,10 +53,15 @@ load_dotenv()
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
+groq_client = None
 try:
-    from groq import Groq
-    groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"), max_retries=0)
-    print("[VIRUS] Groq client ready.")
+    groq_key = os.getenv("GROQ_API_KEY", "").strip()
+    if groq_key:
+        from groq import Groq
+        groq_client = Groq(api_key=groq_key, max_retries=0)
+        print("[VIRUS] Groq client ready.")
+    else:
+        print("[VIRUS] Notice: GROQ_API_KEY not yet configured in .env.")
 except Exception as e:
     print(f"[VIRUS] Groq unavailable: {e}")
     groq_client = None
@@ -2306,11 +2311,16 @@ def _stream_to_tts(stream) -> str:
     return full
 
 
-import edge_tts
+try:
+    import edge_tts
+except Exception:
+    edge_tts = None
 import base64
 import io
 
 async def _generate_neural_mp3_base64(text: str, voice: str = "en-US-GuyNeural") -> str:
+    if edge_tts is None:
+        return ""
     clean = re.sub(r'[*_#`~[\]()]', '', text).strip()
     if not clean:
         return ""

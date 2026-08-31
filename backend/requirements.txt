@@ -9,3 +9,7 @@ pystray
 Pillow
 tzdata
 soundcard
+edge-tts
+groq
+python-dotenv
+psutil
